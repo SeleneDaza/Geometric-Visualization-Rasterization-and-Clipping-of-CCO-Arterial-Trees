@@ -10,16 +10,19 @@ from PySide6.QtWidgets import (
     QPushButton,
     QComboBox,
     QFileDialog,
-    QFrame
+    QFrame,
+    QStackedWidget
 )
 
 from core.loader import ModelLoader
 from visualization.viewer_3d import Viewer3D
+from visualization.viewer_2d import Viewer2D
 
 
 # Raiz do projeto
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_FOLDER = PROJECT_ROOT / "data" / "3D"
+DATA_2D_FOLDER = PROJECT_ROOT / "data" / "2D"
 
 
 class MainWindow(QMainWindow):
@@ -95,18 +98,25 @@ class MainWindow(QMainWindow):
         # Visualizador
         # -------------------------
 
-        self.viewer = Viewer3D(self)
+        self.viewer_container = QStackedWidget()
+        self.viewer_2d = Viewer2D(self)
+        self.viewer_3d = Viewer3D(self)
+        self.viewer_container.addWidget(self.viewer_2d)
+        self.viewer_container.addWidget(self.viewer_3d)
 
         main_layout.addWidget(sidebar)
-        main_layout.addWidget(self.viewer, stretch=1)
+        main_layout.addWidget(self.viewer_container, stretch=1)
 
     def load_available_files(self):
 
         DATA_FOLDER.mkdir(parents=True, exist_ok=True)
+        DATA_2D_FOLDER.mkdir(parents=True, exist_ok=True)
 
-        files = sorted(DATA_FOLDER.glob("*.vtk"))
+        files_2d = sorted(DATA_2D_FOLDER.glob("*.vtk"))
+        files_3d = sorted(DATA_FOLDER.glob("*.vtk"))
+        files = [(file, 2) for file in files_2d] + [(file, 3) for file in files_3d]
 
-        for file in files:
+        for file, _dimension in files:
             self.file_selector.addItem(
                 file.name,
                 str(file)
@@ -117,7 +127,7 @@ class MainWindow(QMainWindow):
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Selecionar arquivo VTK",
-            str(DATA_FOLDER),
+            str(PROJECT_ROOT / "data"),
             "Arquivos VTK (*.vtk)"
         )
 
@@ -151,7 +161,14 @@ class MainWindow(QMainWindow):
             statistics = self.loader.get_statistics()
             radius_range = self.loader.get_radius_range()
 
-            self.viewer.show_model(model)
+            dimension = self.loader.get_dimension()
+
+            if dimension == 2:
+                self.viewer_container.setCurrentWidget(self.viewer_2d)
+                self.viewer_2d.show_model(model)
+            else:
+                self.viewer_container.setCurrentWidget(self.viewer_3d)
+                self.viewer_3d.show_model(model)
 
             # Atualizar estatísticas
             info = (

@@ -10,6 +10,11 @@ class ModelLoader:
     def get_model(self):
         return self.model
 
+    def get_dimension(self):
+        bounds = self.model.bounds
+        z_extent = bounds[5] - bounds[4]
+        return 2 if abs(z_extent) < 1e-8 else 3
+
     def get_statistics(self):
         return {
             "points": self.model.n_points,
