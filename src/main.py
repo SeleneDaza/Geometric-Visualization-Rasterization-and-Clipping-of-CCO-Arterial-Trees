@@ -1,30 +1,31 @@
-import pyvista as pv
 
-# Carrega o modelo
-modelo = pv.read("data/3D/tree3D_Nterm064.vtk")
+from core.loader import ModelLoader
+from visualization.viewer_3d import Viewer3D
 
-# Exibe informações
-print("Quantidade de pontos:", modelo.n_points)
-print("Quantidade de linhas:", modelo.n_lines)
 
-# Exibe os atributos disponíveis
-print("Atributos dos segmentos:", modelo.cell_data.keys())
+# Ruta del modelo
+file_path = "data/3D/tree3D_Nterm064.vtk"
 
-# Recupera os raios
-raios = modelo.cell_data["raio"]
 
-print("Raio mínimo:", raios.min())
-print("Raio máximo:", raios.max())
+# Carregar o modelo
+loader = ModelLoader(file_path)
 
-plotter = pv.Plotter()
+# Recuperar informações
+model = loader.get_model()
+statistics = loader.get_statistics()
+radius_range = loader.get_radius_range()
 
-plotter.add_mesh(
-    modelo,
-    scalars="raio",
-    cmap="viridis",
-    line_width=3
-)
 
-plotter.add_scalar_bar(title="Raio dos vasos")
+# Exibir informações
+print("Quantidade de pontos:", statistics["points"])
+print("Quantidade de linhas:", statistics["lines"])
 
-plotter.show()
+print("Atributos dos segmentos:", statistics["attributes"])
+
+print("Raio mínimo:", radius_range["min"])
+print("Raio máximo:", radius_range["max"])
+
+
+# Visualizar modelo
+viewer = Viewer3D(model)
+viewer.show_model()
