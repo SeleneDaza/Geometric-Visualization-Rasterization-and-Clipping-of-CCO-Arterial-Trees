@@ -1,2 +1,3 @@
 pessoal.txt
 .venv/
+*__pycache__*
