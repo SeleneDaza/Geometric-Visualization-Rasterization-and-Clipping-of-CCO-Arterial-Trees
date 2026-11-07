@@ -1,0 +1,176 @@
+
+from pathlib import Path
+
+from PySide6.QtWidgets import (
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QComboBox,
+    QFileDialog,
+    QFrame
+)
+
+from core.loader import ModelLoader
+from visualization.viewer_3d import Viewer3D
+
+
+# Raiz do projeto
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DATA_FOLDER = PROJECT_ROOT / "data" / "3D"
+
+
+class MainWindow(QMainWindow):
+
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("Arterial Graphics Lab")
+        self.resize(1200, 750)
+
+        self.loader = None
+
+        self.create_interface()
+        self.load_available_files()
+
+    def create_interface(self):
+
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+
+        main_layout = QHBoxLayout(central_widget)
+
+        # -------------------------
+        # Panel lateral
+        # -------------------------
+
+        sidebar = QFrame()
+        sidebar.setFixedWidth(250)
+
+        sidebar_layout = QVBoxLayout(sidebar)
+
+        title = QLabel("Arterial Graphics Lab")
+        title.setStyleSheet(
+            "font-size: 18px; font-weight: bold;"
+        )
+
+        sidebar_layout.addWidget(title)
+
+        sidebar_layout.addWidget(QLabel("Selecionar modelo:"))
+
+        self.file_selector = QComboBox()
+        sidebar_layout.addWidget(self.file_selector)
+
+        self.load_button = QPushButton("Carregar modelo")
+        self.load_button.clicked.connect(
+            self.load_selected_model
+        )
+
+        sidebar_layout.addWidget(self.load_button)
+
+        self.browse_button = QPushButton("Procurar arquivo")
+        self.browse_button.clicked.connect(
+            self.browse_file
+        )
+
+        sidebar_layout.addWidget(self.browse_button)
+
+        sidebar_layout.addSpacing(20)
+
+        sidebar_layout.addWidget(QLabel("Informações do modelo"))
+
+        self.info_label = QLabel(
+            "Nenhum modelo foi carregado."
+        )
+
+        self.info_label.setWordWrap(True)
+
+        sidebar_layout.addWidget(self.info_label)
+
+        sidebar_layout.addStretch()
+
+        # -------------------------
+        # Visualizador
+        # -------------------------
+
+        self.viewer = Viewer3D(self)
+
+        main_layout.addWidget(sidebar)
+        main_layout.addWidget(self.viewer, stretch=1)
+
+    def load_available_files(self):
+
+        DATA_FOLDER.mkdir(parents=True, exist_ok=True)
+
+        files = sorted(DATA_FOLDER.glob("*.vtk"))
+
+        for file in files:
+            self.file_selector.addItem(
+                file.name,
+                str(file)
+            )
+
+    def browse_file(self):
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Selecionar arquivo VTK",
+            str(DATA_FOLDER),
+            "Arquivos VTK (*.vtk)"
+        )
+
+        if file_path:
+
+            index = self.file_selector.findData(file_path)
+
+            if index == -1:
+                self.file_selector.addItem(
+                    Path(file_path).name,
+                    file_path
+                )
+                index = self.file_selector.count() - 1
+
+            self.file_selector.setCurrentIndex(index)
+
+            self.load_selected_model()
+
+    def load_selected_model(self):
+
+        file_path = self.file_selector.currentData()
+
+        if not file_path:
+            return
+
+        try:
+            self.loader = ModelLoader(file_path)
+
+            model = self.loader.get_model()
+
+            statistics = self.loader.get_statistics()
+            radius_range = self.loader.get_radius_range()
+
+            self.viewer.show_model(model)
+
+            # Atualizar estatísticas
+            info = (
+                f"Arquivo: {Path(file_path).name}\n\n"
+                f"Pontos: {statistics['points']}\n"
+                f"Linhas: {statistics['lines']}\n\n"
+                f"Atributos: {statistics['attributes']}"
+            )
+
+            if radius_range is not None:
+                info += (
+                    f"\n\nRaio mínimo: {radius_range['min']:.4f}"
+                    f"\nRaio máximo: {radius_range['max']:.4f}"
+                )
+
+            self.info_label.setText(info)
+
+        except Exception as error:
+
+            self.info_label.setText(
+                f"Erro ao carregar o modelo:\n{error}"
+            )

@@ -1,1 +1,4 @@
-presentation
+|-- presentation/
+| |-- apresentacao.tex
+| |-- apresentacao.pdf
+| |-- figures/

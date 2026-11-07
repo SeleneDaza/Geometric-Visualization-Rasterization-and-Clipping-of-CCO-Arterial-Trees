@@ -21,6 +21,9 @@ class ModelLoader:
         return self.model.cell_data["raio"]
 
     def get_radius_range(self):
+        if "raio" not in self.model.cell_data:
+            return None
+
         radii = self.get_radii()
 
         return {

@@ -1,1 +1,3 @@
-video.gif
+|-- demo/
+| |-- video.gif
+| (opcional)

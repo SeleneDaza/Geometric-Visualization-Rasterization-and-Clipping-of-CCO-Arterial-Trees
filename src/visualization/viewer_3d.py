@@ -1,24 +1,30 @@
 
-import pyvista as pv
+from pyvistaqt import QtInteractor
 
 
-class Viewer3D:
+class Viewer3D(QtInteractor):
 
-    def __init__(self, model):
-        self.model = model
-        self.plotter = pv.Plotter()
+    def __init__(self, parent=None):
+        super().__init__(parent)
 
-    def show_model(self):
+    def show_model(self, model):
 
-        self.plotter.add_mesh(
-            self.model,
-            scalars="raio",
+        self.clear()
+
+        # Verificar se existe o atributo raio
+        has_radius = "raio" in model.cell_data
+
+        self.add_mesh(
+            model,
+            scalars="raio" if has_radius else None,
             cmap="viridis",
             line_width=3
         )
 
-        self.plotter.add_scalar_bar(
-            title="Raio dos vasos"
-        )
+        if has_radius:
+            self.add_scalar_bar(
+                title="Raio dos vasos"
+            )
 
-        self.plotter.show()
+        self.reset_camera()
+        self.render()
