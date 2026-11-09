@@ -1,4 +1,5 @@
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -12,11 +13,61 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from rasterization.bresenham import trace_bresenham_line
+from rasterization.scanline_fill import scanline_fill
+
+
+class CollapsibleSection(QFrame):
+    def __init__(self, title, content, parent=None):
+        super().__init__(parent)
+        self.setObjectName("moduleSection")
+        self.setStyleSheet("""
+            QFrame#moduleSection {
+                background: #ffffff;
+                border: 1px solid #e2e8f0;
+                border-radius: 9px;
+            }
+            QToolButton {
+                border: none;
+                padding: 9px 10px;
+                color: #23344d;
+                font-size: 14px;
+                font-weight: 650;
+                text-align: left;
+            }
+            QToolButton:hover { background: #f5f8fc; }
+        """)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        self.toggle_button = QToolButton()
+        self.toggle_button.setText(title)
+        self.toggle_button.setToolButtonStyle(
+            Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+        )
+        self.toggle_button.setArrowType(Qt.ArrowType.RightArrow)
+        self.toggle_button.setCheckable(True)
+        body = QWidget()
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(8, 0, 8, 8)
+        body_layout.addWidget(content)
+        body.hide()
+        self.toggle_button.toggled.connect(body.setVisible)
+        self.toggle_button.toggled.connect(
+            lambda checked: self.toggle_button.setArrowType(
+                Qt.ArrowType.DownArrow if checked else Qt.ArrowType.RightArrow
+            )
+        )
+        layout.addWidget(self.toggle_button)
+        layout.addWidget(body)
+
+    def set_expanded(self, expanded):
+        self.toggle_button.setChecked(bool(expanded))
 
 
 class RasterizationCanvas(QWidget):
@@ -330,8 +381,234 @@ class BresenhamModule(QFrame):
             self.inspection_pixel_changed.emit(pixel)
 
 
+class ScanlineModule(QFrame):
+    mode_requested = Signal(bool)
+    roi_finish_requested = Signal()
+    roi_clear_requested = Signal()
+    fill_step_changed = Signal(object)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("moduleCard")
+        self._mode_active = False
+        self._roi_finalized = False
+        self._vertices = []
+        self._steps = ()
+        self._step_index = 0
+        self._timer = QTimer(self)
+        self._timer.setInterval(110)
+        self._timer.timeout.connect(self._advance_fill)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+
+        heading_row = QHBoxLayout()
+        heading = QLabel("Rellenado Scanline (ET / AET)")
+        heading.setObjectName("moduleHeading")
+        heading_row.addWidget(heading)
+        heading_row.addStretch()
+        self.mode_button = QPushButton("Delimitar ROI (R)")
+        self.mode_button.setToolTip(
+            "Activa la delimitación de una ROI en el visualizador 2D (R)"
+        )
+        self.mode_button.clicked.connect(
+            lambda: self.mode_requested.emit(not self._mode_active)
+        )
+        heading_row.addWidget(self.mode_button)
+        layout.addLayout(heading_row)
+
+        description = QLabel(
+            "Activa el modo y haz clic en la figura para marcar los vértices. "
+            "Finaliza el polígono para ver el relleno scanline paso a paso."
+        )
+        description.setWordWrap(True)
+        layout.addWidget(description)
+
+        controls = QHBoxLayout()
+        self.finish_button = QPushButton("Finalizar polígono")
+        self.finish_button.clicked.connect(self.roi_finish_requested)
+        self.finish_button.setEnabled(False)
+        controls.addWidget(self.finish_button)
+        self.clear_button = QPushButton("Limpiar ROI")
+        self.clear_button.clicked.connect(self._request_clear_roi)
+        self.clear_button.setEnabled(False)
+        controls.addWidget(self.clear_button)
+        layout.addLayout(controls)
+
+        self.status_label = QLabel("Modo de delimitación desactivado.")
+        self.status_label.setObjectName("mutedText")
+        self.status_label.setWordWrap(True)
+        layout.addWidget(self.status_label)
+
+        tables = QHBoxLayout()
+        self.edge_table = self._make_table(
+            ("Y mín.", "Y máx.", "X inicial", "1/m")
+        )
+        self.active_edge_table = self._make_table(
+            ("Y máx.", "X actual", "1/m")
+        )
+        tables.addWidget(self.edge_table)
+        tables.addWidget(self.active_edge_table)
+        layout.addLayout(tables)
+
+        self._edge_rows = []
+
+    @staticmethod
+    def _make_table(headers):
+        table = QTableWidget(0, len(headers))
+        table.setHorizontalHeaderLabels(headers)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        table.setAlternatingRowColors(True)
+        table.setMinimumHeight(100)
+        return table
+
+    def set_mode_active(self, active):
+        active = bool(active)
+        if active == self._mode_active:
+            return
+        self._mode_active = active
+        self._roi_finalized = False
+        self._timer.stop()
+        self.fill_step_changed.emit(None)
+        self._vertices.clear()
+        self._steps = ()
+        self.edge_table.setRowCount(0)
+        self.active_edge_table.setRowCount(0)
+        self.mode_button.setText(
+            "Cancelar ROI" if active else "Delimitar ROI (R)"
+        )
+        self.finish_button.setEnabled(False)
+        self.clear_button.setEnabled(active)
+        self.status_label.setText(
+            "Haz clic en al menos tres puntos de la figura y finaliza el "
+            "polígono."
+            if active else "Modo de delimitación desactivado."
+        )
+
+    def add_roi_vertex(self, vertex):
+        if not self._mode_active or self._roi_finalized:
+            return
+        self._vertices.append(vertex)
+        self.finish_button.setEnabled(len(self._vertices) >= 3)
+        self.status_label.setText(
+            f"Vértices marcados: {len(self._vertices)}. "
+            "Añade más o finaliza el polígono."
+        )
+
+    def set_roi_vertices(self, vertices):
+        if not self._mode_active:
+            return
+        self._vertices = list(vertices)
+        self.finish_button.setEnabled(len(self._vertices) >= 3)
+        self.status_label.setText(
+            f"Vértices marcados: {len(self._vertices)}."
+        )
+
+    def start_fill(self, vertices):
+        if not self._mode_active:
+            return
+        self._timer.stop()
+        self._roi_finalized = True
+        self.finish_button.setEnabled(False)
+        self.clear_button.setEnabled(True)
+        try:
+            result = scanline_fill(vertex["pixel"] for vertex in vertices)
+        except ValueError as error:
+            self.status_label.setText(str(error))
+            return
+
+        self._vertices = list(vertices)
+        self._steps = result.steps
+        self._step_index = 0
+        self.edge_table.setRowCount(0)
+        self._edge_rows.clear()
+        for y_min, edges in sorted(result.edge_table.items()):
+            for edge in edges:
+                self._add_row(
+                    self.edge_table,
+                    (y_min, edge.y_max, f"{edge.x_intersection:.2f}",
+                     f"{edge.inverse_slope:.3f}"),
+                )
+                self._edge_rows.append((y_min, edge))
+        self.fill_step_changed.emit(None)
+        self.status_label.setText(
+            f"ET: {len(self._edge_rows)} arestas · "
+            f"{len(self._steps)} linhas de varredura."
+        )
+        self._advance_fill()
+        self.status_label.setText(
+            "ROI finalizada y bloqueada. Usa «Limpiar ROI» para dibujar "
+            "otro polígono."
+        )
+        if self._step_index < len(self._steps):
+            self._timer.start()
+
+    def _advance_fill(self):
+        if self._step_index >= len(self._steps):
+            self._timer.stop()
+            return
+
+        step = self._steps[self._step_index]
+        self.active_edge_table.setRowCount(0)
+        for edge in step.active_edges:
+            self._add_row(
+                self.active_edge_table,
+                (edge.y_max, f"{edge.x_intersection:.2f}",
+                 f"{edge.inverse_slope:.3f}"),
+            )
+        self.fill_step_changed.emit({
+            "y": step.y,
+            "spans": step.spans,
+        })
+        self.status_label.setText(
+            f"Scanline y={step.y} · AET: {len(step.active_edges)} arestas · "
+            f"intervalos preenchidos: {step.spans or 'nenhum'}"
+        )
+        self._step_index += 1
+        if self._step_index == len(self._steps):
+            self._timer.stop()
+            self.status_label.setText(
+                f"Preenchimento concluído · {len(self._steps)} scanlines."
+            )
+
+    @staticmethod
+    def _add_row(table, values):
+        row = table.rowCount()
+        table.insertRow(row)
+        for column, value in enumerate(values):
+            table.setItem(row, column, QTableWidgetItem(str(value)))
+
+    def clear_roi(self):
+        if not self._mode_active:
+            return
+        self._timer.stop()
+        self._vertices.clear()
+        self._roi_finalized = False
+        self._steps = ()
+        self._step_index = 0
+        self.edge_table.setRowCount(0)
+        self.active_edge_table.setRowCount(0)
+        self._edge_rows.clear()
+        self.fill_step_changed.emit(None)
+        self.finish_button.setEnabled(False)
+        self.clear_button.setEnabled(self._mode_active)
+        self.status_label.setText(
+            "ROI limpia. Haz clic en la figura para marcar vértices."
+        )
+        self.roi_clear_requested.emit()
+
+    def _request_clear_roi(self):
+        self.clear_roi()
+
+
 class DidacticPanel(QFrame):
     close_requested = Signal()
+    roi_clear_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -390,37 +667,61 @@ class DidacticPanel(QFrame):
         header_layout.addWidget(self.close_button)
         root_layout.addWidget(header)
 
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
-        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         content = QWidget()
         content.setMinimumWidth(0)
         content_layout = QVBoxLayout(content)
         content_layout.setContentsMargins(16, 16, 16, 20)
         content_layout.setSpacing(14)
 
-        section_title = QLabel("Rasterização de linhas")
-        section_title.setObjectName("moduleHeading")
-        content_layout.addWidget(section_title)
         self.bresenham_module = BresenhamModule()
-        content_layout.addWidget(self.bresenham_module)
+        self.bresenham_section = self._collapsible_section(
+            "Bresenham",
+            self.bresenham_module,
+        )
+        content_layout.addWidget(self.bresenham_section)
+
+        self.scanline_module = ScanlineModule()
+        self.scanline_module.roi_finish_requested.connect(
+            self._request_roi_finish
+        )
+        self.scanline_module.roi_clear_requested.connect(
+            self._request_roi_clear
+        )
+        self.scanline_module.fill_step_changed.connect(
+            self._forward_fill_step
+        )
+        self.scanline_section = self._collapsible_section(
+            "Región de interés (ROI)",
+            self.scanline_module,
+        )
+        content_layout.addWidget(self.scanline_section)
 
         future_modules = (
-            "Preenchimento Scanline",
             "Suavização de serrilhado (Xiaolin Wu / SSAA)",
             "Recorte Cohen–Sutherland",
             "Recorte Liang–Barsky / Cyrus–Beck",
             "Recorte Sutherland–Hodgman",
         )
         for module_name in future_modules:
-            content_layout.addWidget(self._future_module(module_name))
+            section = self._collapsible_section(
+                module_name,
+                self._future_module(module_name),
+            )
+            content_layout.addWidget(section)
+        self.sections = {
+            "bresenham": self.bresenham_section,
+            "scanline": self.scanline_section,
+        }
         content_layout.addStretch()
 
-        scroll_area.setWidget(content)
-        root_layout.addWidget(scroll_area, stretch=1)
+        self.scroll_area.setWidget(content)
+        root_layout.addWidget(self.scroll_area, stretch=1)
 
     @staticmethod
     def _future_module(name):
@@ -439,5 +740,30 @@ class DidacticPanel(QFrame):
         layout.addWidget(status)
         return card
 
+    @staticmethod
+    def _collapsible_section(title, content):
+        return CollapsibleSection(title, content)
+
+    def set_module_expanded(self, name, expanded):
+        section = self.sections[name]
+        section.set_expanded(expanded)
+        if expanded:
+            self.scroll_area.ensureWidgetVisible(section)
+
     def _request_close(self):
         self.close_requested.emit()
+
+    def _request_roi_finish(self):
+        self.roi_finish_requested.emit()
+
+    roi_finish_requested = Signal()
+
+    def _request_roi_clear(self):
+        self.roi_clear_requested.emit()
+
+    roi_clear_requested = Signal()
+
+    def _forward_fill_step(self, step):
+        self.fill_step_changed.emit(step)
+
+    fill_step_changed = Signal(object)

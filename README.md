@@ -27,6 +27,12 @@ em 2D ou 3D.
   CCO. A grade de pixels e a tabela `pₖ` aparecem no módulo; ao escolher um
   passo, a artéria e o pixel em análise ficam destacados na figura. O módulo
   também permite informar manualmente os extremos de uma reta.
+- **RF09 — Rellenado de región de interés:** pressione `R` para ativar a
+  delimitação de um polígono ROI com cliques no visualizador 2D. Ao finalizar,
+  o contorno muda de cor, fica bloqueado para edição, e o preenchimento
+  Scanline é animado com as tabelas ET/AET atualizadas a cada linha. Use
+  «Limpiar ROI» para remover o polígono. Os modos Bresenham (`I`) e ROI (`R`)
+  são mutuamente exclusivos: ativar um encerra automaticamente o outro.
 
 ## Execução
 
@@ -41,6 +47,10 @@ adicionar arquivos `.vtk` ou pastas pelo aplicativo. No visualizador 2D,
 pressione `I` para abrir o módulo de Bresenham e ativar a lupa; clique em uma
 artéria e selecione uma linha da tabela para destacar seu pixel. Pressione `I`
 novamente ou «Fechar painel» para sair do modo.
+Para o Scanline, pressione `R`, marque pelo menos três vértices no modelo e
+selecione «Finalizar polígono». O contorno muda de cor e fica bloqueado; use
+«Limpar ROI» para recomeçar. Os módulos didáticos são expansíveis e começam
+recolhidos; ativar `I` ou `R` expande o módulo correspondente e troca o modo.
 
 ## Testes
 
