@@ -3,7 +3,10 @@ from pathlib import Path
 
 import pyvista as pv
 
-from src.visualization.arterial_renderer import add_arterial_mesh
+from src.visualization.arterial_renderer import (
+    add_arterial_mesh,
+    set_anti_aliasing,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -60,6 +63,27 @@ class ArterialRendererTests(unittest.TestCase):
     def test_rejects_unknown_color_map(self):
         with self.assertRaises(ValueError):
             add_arterial_mesh(RecordingPlotter(), self.model, "unknown")
+
+    def test_antialiasing_can_be_enabled_and_disabled(self):
+        class AntiAliasingPlotter:
+            def __init__(self):
+                self.calls = []
+
+            def enable_anti_aliasing(self, method):
+                self.calls.append(("enable", method))
+
+            def disable_anti_aliasing(self):
+                self.calls.append(("disable",))
+
+        plotter = AntiAliasingPlotter()
+
+        set_anti_aliasing(plotter, True)
+        set_anti_aliasing(plotter, False)
+
+        self.assertEqual(
+            plotter.calls,
+            [("enable", "fxaa"), ("disable",)],
+        )
 
 
 if __name__ == "__main__":

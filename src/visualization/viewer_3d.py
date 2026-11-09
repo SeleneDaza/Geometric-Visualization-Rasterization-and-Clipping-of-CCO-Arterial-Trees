@@ -7,7 +7,10 @@ from visualization.affine_transform import (
     scale_matrix,
     translation_matrix,
 )
-from visualization.arterial_renderer import add_arterial_mesh
+from visualization.arterial_renderer import (
+    add_arterial_mesh,
+    set_anti_aliasing,
+)
 
 
 class Viewer3D(QtInteractor):
@@ -15,6 +18,7 @@ class Viewer3D(QtInteractor):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._model = None
+        self._anti_aliasing_enabled = True
         self._color_map = "viridis"
         self._transform_matrix = np.eye(4)
         self._translation = (0.0, 0.0, 0.0)
@@ -33,6 +37,15 @@ class Viewer3D(QtInteractor):
     def set_color_map(self, color_map):
         self._color_map = color_map
         self._render_model()
+
+    def set_antialiasing(self, enabled):
+        self._anti_aliasing_enabled = bool(enabled)
+        self._apply_anti_aliasing()
+        if self._model is not None:
+            self.render()
+
+    def _apply_anti_aliasing(self):
+        set_anti_aliasing(self, self._anti_aliasing_enabled)
 
     def translate(self, x, y, z):
         if self._model is None:
@@ -133,8 +146,61 @@ class Viewer3D(QtInteractor):
             self.disable_parallel_projection()
         self.render()
 
+    def wheelEvent(self, event):
+        horizontal_delta = event.pixelDelta().x()
+        if horizontal_delta == 0:
+            horizontal_delta = event.angleDelta().x() / 3
+
+        if self._model is not None and horizontal_delta:
+            self._translate_horizontally(horizontal_delta)
+            event.accept()
+            return
+
+        super().wheelEvent(event)
+
+    def _translate_horizontally(self, pixel_delta):
+        if self._model.length <= 0:
+            raise RuntimeError("O modelo 3D não possui extensão para translação.")
+
+        camera = self.renderer.GetActiveCamera()
+        camera_direction = np.asarray(
+            camera.GetDirectionOfProjection(), dtype=float
+        )
+        camera_up = np.asarray(camera.GetViewUp(), dtype=float)
+        camera_right = np.cross(camera_direction, camera_up)
+        camera_right /= np.linalg.norm(camera_right)
+
+        viewport_height = max(1, self.height())
+        if camera.GetParallelProjection():
+            world_units_per_pixel = (
+                2 * camera.GetParallelScale() / viewport_height
+            )
+        else:
+            camera_distance = np.linalg.norm(
+                np.asarray(camera.GetFocalPoint())
+                - np.asarray(camera.GetPosition())
+            )
+            world_units_per_pixel = (
+                2
+                * camera_distance
+                * np.tan(np.deg2rad(camera.GetViewAngle() / 2))
+                / viewport_height
+            )
+
+        world_delta = camera_right * pixel_delta * world_units_per_pixel
+        translation = tuple(
+            float(np.clip(current + delta / self._model.length, -1.0, 1.0))
+            for current, delta in zip(self._translation, world_delta)
+        )
+        self.set_transform_parameters(
+            translation,
+            self._rotation,
+            self._scale,
+        )
+
     def _render_model(self, reset_camera=False):
         self.clear()
+        self._apply_anti_aliasing()
         transformed_model = self._model.transform(
             self._transform_matrix,
             inplace=False,

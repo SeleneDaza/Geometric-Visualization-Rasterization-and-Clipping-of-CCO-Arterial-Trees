@@ -9,7 +9,10 @@ from visualization.artery_inspector import (
     original_cell_id,
     raster_grid_endpoints,
 )
-from visualization.arterial_renderer import add_arterial_mesh
+from visualization.arterial_renderer import (
+    add_arterial_mesh,
+    set_anti_aliasing,
+)
 
 
 class Viewer2D(QtInteractor):
@@ -20,6 +23,7 @@ class Viewer2D(QtInteractor):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._model = None
+        self._anti_aliasing_enabled = True
         self._inspection_observer = None
         self._inspection_enabled = False
         self._inspection_selection = None
@@ -56,11 +60,69 @@ class Viewer2D(QtInteractor):
         self._clear_roi_actors()
         self._roi_vertices.clear()
         self._roi_finalized = False
+        self._apply_anti_aliasing()
         add_arterial_mesh(self, model, color_map)
         self.view_xy()
         self.reset_camera()
         self.render()
         self.artery_selected.emit(None)
+
+    def set_antialiasing(self, enabled):
+        self._anti_aliasing_enabled = bool(enabled)
+        self._apply_anti_aliasing()
+        if self._model is not None:
+            self.render()
+
+    def _apply_anti_aliasing(self):
+        set_anti_aliasing(self, self._anti_aliasing_enabled)
+
+    def wheelEvent(self, event):
+        horizontal_delta = event.pixelDelta().x()
+        if horizontal_delta == 0:
+            horizontal_delta = event.angleDelta().x() / 3
+
+        if self._model is not None and horizontal_delta:
+            self._pan_horizontally(horizontal_delta)
+            event.accept()
+            return
+
+        super().wheelEvent(event)
+
+    def _pan_horizontally(self, pixel_delta):
+        camera = self.renderer.GetActiveCamera()
+        camera_direction = np.asarray(
+            camera.GetDirectionOfProjection(), dtype=float
+        )
+        camera_up = np.asarray(camera.GetViewUp(), dtype=float)
+        camera_right = np.cross(camera_direction, camera_up)
+        camera_right /= np.linalg.norm(camera_right)
+
+        viewport_height = max(1, self.height())
+        if camera.GetParallelProjection():
+            world_units_per_pixel = (
+                2 * camera.GetParallelScale() / viewport_height
+            )
+        else:
+            camera_distance = np.linalg.norm(
+                np.asarray(camera.GetFocalPoint())
+                - np.asarray(camera.GetPosition())
+            )
+            world_units_per_pixel = (
+                2
+                * camera_distance
+                * np.tan(np.deg2rad(camera.GetViewAngle() / 2))
+                / viewport_height
+            )
+
+        camera_offset = -camera_right * pixel_delta * world_units_per_pixel
+        camera.SetPosition(
+            np.asarray(camera.GetPosition()) + camera_offset
+        )
+        camera.SetFocalPoint(
+            np.asarray(camera.GetFocalPoint()) + camera_offset
+        )
+        self.renderer.ResetCameraClippingRange()
+        self.render()
 
     def set_artery_inspection_enabled(self, enabled):
         enabled = bool(enabled)

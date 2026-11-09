@@ -3,6 +3,7 @@ from pathlib import Path
 from PySide6.QtCore import QThread, Signal, Qt
 from PySide6.QtGui import QAction, QGuiApplication
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFileDialog,
     QFrame,
@@ -12,6 +13,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QSplitter,
     QStackedWidget,
     QVBoxLayout,
@@ -177,55 +179,67 @@ class MainWindow(QMainWindow):
         sidebar.setMinimumWidth(180)
         sidebar.setMaximumWidth(420)
         sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setContentsMargins(18, 20, 18, 18)
-        sidebar_layout.setSpacing(10)
+        sidebar_layout.setContentsMargins(0, 0, 0, 0)
+        sidebar_layout.setSpacing(0)
+        sidebar_scroll_area = QScrollArea()
+        sidebar_scroll_area.setWidgetResizable(True)
+        sidebar_scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        sidebar_scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        sidebar_content = QWidget()
+        sidebar_content_layout = QVBoxLayout(sidebar_content)
+        sidebar_content_layout.setContentsMargins(18, 20, 18, 18)
+        sidebar_content_layout.setSpacing(10)
+        sidebar_scroll_area.setWidget(sidebar_content)
+        sidebar_layout.addWidget(sidebar_scroll_area)
 
         title = QLabel("Laboratório de Gráficos Arteriais")
         title.setObjectName("appTitle")
-        sidebar_layout.addWidget(title)
-        sidebar_layout.addSpacing(10)
+        sidebar_content_layout.addWidget(title)
+        sidebar_content_layout.addSpacing(10)
 
         model_title = QLabel("Selecionar modelo")
         model_title.setObjectName("sectionTitle")
-        sidebar_layout.addWidget(model_title)
+        sidebar_content_layout.addWidget(model_title)
 
         self.file_selector = QComboBox()
-        sidebar_layout.addWidget(self.file_selector)
+        sidebar_content_layout.addWidget(self.file_selector)
 
         self.load_button = QPushButton("Carregar modelo")
         self.load_button.clicked.connect(self.load_selected_model)
-        sidebar_layout.addWidget(self.load_button)
+        sidebar_content_layout.addWidget(self.load_button)
 
         self.browse_button = QPushButton("Adicionar arquivos")
         self.browse_button.clicked.connect(self.browse_file)
-        sidebar_layout.addWidget(self.browse_button)
+        sidebar_content_layout.addWidget(self.browse_button)
 
         self.directory_button = QPushButton("Adicionar pasta")
         self.directory_button.clicked.connect(self.browse_directory)
-        sidebar_layout.addWidget(self.directory_button)
+        sidebar_content_layout.addWidget(self.directory_button)
 
-        sidebar_layout.addSpacing(16)
+        sidebar_content_layout.addSpacing(16)
         status_title = QLabel("Status")
         status_title.setObjectName("sectionTitle")
-        sidebar_layout.addWidget(status_title)
+        sidebar_content_layout.addWidget(status_title)
 
         self.status_label = QLabel("Preparando visualizadores...")
         self.status_label.setObjectName("statusLabel")
         self.status_label.setWordWrap(True)
-        sidebar_layout.addWidget(self.status_label)
+        sidebar_content_layout.addWidget(self.status_label)
 
-        sidebar_layout.addSpacing(8)
+        sidebar_content_layout.addSpacing(8)
         info_title = QLabel("Informações do modelo")
         info_title.setObjectName("sectionTitle")
-        sidebar_layout.addWidget(info_title)
+        sidebar_content_layout.addWidget(info_title)
 
         self.info_label = QLabel("Nenhum modelo carregado.")
         self.info_label.setWordWrap(True)
-        sidebar_layout.addWidget(self.info_label)
+        sidebar_content_layout.addWidget(self.info_label)
 
         color_map_title = QLabel("Mapa de cores")
         color_map_title.setObjectName("sectionTitle")
-        sidebar_layout.addWidget(color_map_title)
+        sidebar_content_layout.addWidget(color_map_title)
 
         self.color_map_selector = QComboBox()
         self.color_map_selector.addItem("Viridis", "viridis")
@@ -234,8 +248,21 @@ class MainWindow(QMainWindow):
         self.color_map_selector.currentIndexChanged.connect(
             self._update_color_map
         )
-        sidebar_layout.addWidget(self.color_map_selector)
-        sidebar_layout.addStretch()
+        sidebar_content_layout.addWidget(self.color_map_selector)
+
+        antialiasing_title = QLabel("Suavização de bordas")
+        antialiasing_title.setObjectName("sectionTitle")
+        sidebar_content_layout.addWidget(antialiasing_title)
+
+        self.antialiasing_checkbox = QCheckBox("Ativar antialiasing (FXAA)")
+        self.antialiasing_checkbox.setChecked(True)
+        self.antialiasing_checkbox.setToolTip(
+            "Aplica filtragem de subpixel para suavizar as artérias nos "
+            "visualizadores 2D e 3D."
+        )
+        self.antialiasing_checkbox.toggled.connect(self._update_antialiasing)
+        sidebar_content_layout.addWidget(self.antialiasing_checkbox)
+        sidebar_content_layout.addStretch()
 
         self.visualization_surface = VisualizationSurface()
         self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -328,6 +355,9 @@ class MainWindow(QMainWindow):
             self.viewer_3d = viewer_3d_class(self)
             self.visualization_surface.set_viewers(
                 self.viewer_2d, self.viewer_3d
+            )
+            self._update_antialiasing(
+                self.antialiasing_checkbox.isChecked()
             )
             self._connect_transform_controls()
             self.visualization_surface.hide_loading()
@@ -529,6 +559,12 @@ class MainWindow(QMainWindow):
             self.viewer_2d.show_model(model, color_map)
         else:
             self.viewer_3d.set_color_map(color_map)
+
+    def _update_antialiasing(self, enabled):
+        for viewer_name in ("viewer_2d", "viewer_3d"):
+            viewer = getattr(self, viewer_name, None)
+            if viewer is not None:
+                viewer.set_antialiasing(enabled)
 
     def _model_load_failed(self, request_id, file_path, error):
         if request_id != self._active_load_id:

@@ -10,6 +10,13 @@ COLOR_MAPS = {
 _WIDTHS = np.linspace(2.0, 7.0, 8)
 
 
+def set_anti_aliasing(plotter, enabled):
+    if enabled:
+        plotter.enable_anti_aliasing("fxaa")
+    else:
+        plotter.disable_anti_aliasing()
+
+
 def add_arterial_mesh(plotter, model, color_map="viridis"):
     if color_map not in COLOR_MAPS:
         raise ValueError(f"Mapa de cores não suportado: {color_map}")
