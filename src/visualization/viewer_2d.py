@@ -9,7 +9,10 @@ from visualization.artery_inspector import (
     original_cell_id,
     raster_grid_endpoints,
 )
-from visualization.arterial_renderer import add_arterial_mesh
+from visualization.arterial_renderer import (
+    add_arterial_mesh,
+    set_anti_aliasing,
+)
 
 
 class Viewer2D(QtInteractor):
@@ -20,6 +23,7 @@ class Viewer2D(QtInteractor):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._model = None
+        self._anti_aliasing_enabled = True
         self._inspection_observer = None
         self._inspection_enabled = False
         self._inspection_selection = None
@@ -56,11 +60,21 @@ class Viewer2D(QtInteractor):
         self._clear_roi_actors()
         self._roi_vertices.clear()
         self._roi_finalized = False
+        self._apply_anti_aliasing()
         add_arterial_mesh(self, model, color_map)
         self.view_xy()
         self.reset_camera()
         self.render()
         self.artery_selected.emit(None)
+
+    def set_antialiasing(self, enabled):
+        self._anti_aliasing_enabled = bool(enabled)
+        self._apply_anti_aliasing()
+        if self._model is not None:
+            self.render()
+
+    def _apply_anti_aliasing(self):
+        set_anti_aliasing(self, self._anti_aliasing_enabled)
 
     def set_artery_inspection_enabled(self, enabled):
         enabled = bool(enabled)

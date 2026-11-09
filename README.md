@@ -33,6 +33,9 @@ em 2D ou 3D.
   Scanline é animado com as tabelas ET/AET atualizadas a cada linha. Use
   «Limpiar ROI» para remover o polígono. Os modos Bresenham (`I`) e ROI (`R`)
   são mutuamente exclusivos: ativar um encerra automaticamente o outro.
+- **RF10 — Alternância de antialiasing:** a opção «Ativar antialiasing (FXAA)»
+  na barra lateral liga ou desliga a filtragem de subpixel nos visualizadores
+  2D e 3D, permitindo comparar as bordas das artérias com e sem suavização.
 
 ## Execução
 
@@ -47,6 +50,8 @@ adicionar arquivos `.vtk` ou pastas pelo aplicativo. No visualizador 2D,
 pressione `I` para abrir o módulo de Bresenham e ativar a lupa; clique em uma
 artéria e selecione uma linha da tabela para destacar seu pixel. Pressione `I`
 novamente ou «Fechar painel» para sair do modo.
+Use «Ativar antialiasing (FXAA)» na barra lateral para alternar a suavização
+das artérias em qualquer visualizador.
 Para o Scanline, pressione `R`, marque pelo menos três vértices no modelo e
 selecione «Finalizar polígono». O contorno muda de cor e fica bloqueado; use
 «Limpar ROI» para recomeçar. Os módulos didáticos são expansíveis e começam

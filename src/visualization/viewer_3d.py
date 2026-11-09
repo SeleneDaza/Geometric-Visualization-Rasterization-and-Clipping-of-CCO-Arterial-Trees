@@ -7,7 +7,10 @@ from visualization.affine_transform import (
     scale_matrix,
     translation_matrix,
 )
-from visualization.arterial_renderer import add_arterial_mesh
+from visualization.arterial_renderer import (
+    add_arterial_mesh,
+    set_anti_aliasing,
+)
 
 
 class Viewer3D(QtInteractor):
@@ -15,6 +18,7 @@ class Viewer3D(QtInteractor):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._model = None
+        self._anti_aliasing_enabled = True
         self._color_map = "viridis"
         self._transform_matrix = np.eye(4)
         self._translation = (0.0, 0.0, 0.0)
@@ -33,6 +37,15 @@ class Viewer3D(QtInteractor):
     def set_color_map(self, color_map):
         self._color_map = color_map
         self._render_model()
+
+    def set_antialiasing(self, enabled):
+        self._anti_aliasing_enabled = bool(enabled)
+        self._apply_anti_aliasing()
+        if self._model is not None:
+            self.render()
+
+    def _apply_anti_aliasing(self):
+        set_anti_aliasing(self, self._anti_aliasing_enabled)
 
     def translate(self, x, y, z):
         if self._model is None:
@@ -135,6 +148,7 @@ class Viewer3D(QtInteractor):
 
     def _render_model(self, reset_camera=False):
         self.clear()
+        self._apply_anti_aliasing()
         transformed_model = self._model.transform(
             self._transform_matrix,
             inplace=False,

@@ -703,7 +703,6 @@ class DidacticPanel(QFrame):
         content_layout.addWidget(self.scanline_section)
 
         future_modules = (
-            "Suavização de serrilhado (Xiaolin Wu / SSAA)",
             "Recorte Cohen–Sutherland",
             "Recorte Liang–Barsky / Cyrus–Beck",
             "Recorte Sutherland–Hodgman",
