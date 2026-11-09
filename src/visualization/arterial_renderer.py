@@ -12,7 +12,7 @@ _WIDTHS = np.linspace(2.0, 7.0, 8)
 
 def add_arterial_mesh(plotter, model, color_map="viridis"):
     if color_map not in COLOR_MAPS:
-        raise ValueError(f"Mapa de color no soportado: {color_map}")
+        raise ValueError(f"Mapa de cores não suportado: {color_map}")
 
     if "raio" not in model.cell_data:
         plotter.add_mesh(model, color="#1769aa", line_width=3)
@@ -21,7 +21,7 @@ def add_arterial_mesh(plotter, model, color_map="viridis"):
     radii = np.asarray(model.cell_data["raio"], dtype=float)
     if radii.size != model.n_cells:
         raise ValueError(
-            "El atributo 'raio' debe contener un valor por segmento."
+            "O atributo 'raio' deve conter um valor para cada segmento."
         )
 
     valid = np.isfinite(radii)
@@ -57,7 +57,7 @@ def add_arterial_mesh(plotter, model, color_map="viridis"):
             clim=color_limits,
             line_width=float(line_width),
             show_scalar_bar=not color_bar_added,
-            scalar_bar_args={"title": "Radio de los vasos"},
+            scalar_bar_args={"title": "Raio dos vasos"},
         )
         color_bar_added = True
 

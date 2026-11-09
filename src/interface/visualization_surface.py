@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from interface.didactic_panel import DidacticPanel
+from interface.transform_panel import TransformPanel
 
 
 class VisualizationSurface(QWidget):
@@ -43,10 +44,16 @@ class VisualizationSurface(QWidget):
         self.didactic_panel = DidacticPanel(self)
         self.didactic_panel.setMinimumWidth(230)
         self._content_splitter.addWidget(self.didactic_panel)
+        self.transform_panel = TransformPanel(self)
+        self._content_splitter.addWidget(self.transform_panel)
         self._content_splitter.setStretchFactor(0, 1)
         self._content_splitter.setStretchFactor(1, 0)
         self.didactic_panel.close_requested.connect(self.close_didactic_panel)
+        self.transform_panel.close_requested.connect(
+            self.close_transform_panel
+        )
         self.didactic_panel.hide()
+        self.transform_panel.hide()
 
         self.didactic_button = QPushButton("Modo didático", self)
         self.didactic_button.setFixedSize(144, 38)
@@ -62,6 +69,21 @@ class VisualizationSurface(QWidget):
         """)
         self.didactic_button.clicked.connect(self.toggle_didactic_panel)
         self.didactic_button.hide()
+
+        self.transform_button = QPushButton("Transformar cena", self)
+        self.transform_button.setFixedSize(168, 38)
+        self.transform_button.setStyleSheet("""
+            QPushButton {
+                background: #1769aa;
+                color: #ffffff;
+                border: none;
+                border-radius: 8px;
+                font-weight: 600;
+            }
+            QPushButton:hover { background: #12588f; }
+        """)
+        self.transform_button.clicked.connect(self.toggle_transform_panel)
+        self.transform_button.hide()
 
         surface_layout = QHBoxLayout(self)
         surface_layout.setContentsMargins(0, 0, 0, 0)
@@ -92,13 +114,16 @@ class VisualizationSurface(QWidget):
 
     def set_model_dimension(self, dimension):
         self._is_2d = dimension == 2
+        if self._panel_open:
+            self.didactic_panel.hide()
+            self.transform_panel.hide()
+            self._panel_open = False
         self.viewer_title.setText(
             "Visualizador 2D" if self._is_2d else "Visualizador 3D"
         )
         self.viewer_title.show()
-        self.didactic_button.setVisible(self._is_2d and not self._panel_open)
-        if not self._is_2d and self._panel_open:
-            self.close_didactic_panel()
+        self.didactic_button.setVisible(self._is_2d)
+        self.transform_button.setVisible(not self._is_2d)
 
     def show_loading(self, message):
         self.loading_label.setText(message)
@@ -135,7 +160,7 @@ class VisualizationSurface(QWidget):
             max(self.didactic_panel.minimumWidth(), self.width() - 180),
         )
         self._content_splitter.setSizes(
-            [max(180, self.width() - panel_width), panel_width]
+            [max(180, self.width() - panel_width), panel_width, 0]
         )
 
     def close_didactic_panel(self):
@@ -145,6 +170,34 @@ class VisualizationSurface(QWidget):
         self.didactic_panel.hide()
         self.didactic_button.setVisible(self._is_2d)
 
+    def toggle_transform_panel(self):
+        if self._panel_open:
+            self.close_transform_panel()
+        else:
+            self.open_transform_panel()
+
+    def open_transform_panel(self):
+        if self._is_2d:
+            return
+        self._panel_open = True
+        self.transform_button.hide()
+        self.transform_panel.show()
+        panel_width = min(
+            max(int(self.width() * 0.38), self.transform_panel.minimumWidth()),
+            360,
+            max(self.transform_panel.minimumWidth(), self.width() - 180),
+        )
+        self._content_splitter.setSizes(
+            [max(180, self.width() - panel_width), 0, panel_width]
+        )
+
+    def close_transform_panel(self):
+        if not self._panel_open:
+            return
+        self._panel_open = False
+        self.transform_panel.hide()
+        self.transform_button.setVisible(not self._is_2d)
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.loading_overlay.setGeometry(self.rect())
@@ -152,9 +205,14 @@ class VisualizationSurface(QWidget):
             self.width() - self.didactic_button.width() - 18, 16
         )
         self.viewer_title.move(16, 16)
+        self.transform_button.move(
+            self.width() - self.transform_button.width() - 18, 16
+        )
         if self.loading_overlay.isVisible():
             self.loading_overlay.raise_()
         else:
             self.viewer_title.raise_()
             if self._is_2d:
                 self.didactic_button.raise_()
+            else:
+                self.transform_button.raise_()

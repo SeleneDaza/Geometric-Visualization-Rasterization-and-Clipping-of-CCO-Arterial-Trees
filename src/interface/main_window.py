@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal, Qt
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QAction, QGuiApplication
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -120,7 +120,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Arterial Graphics Lab")
+        self.setWindowTitle("Laboratório de Gráficos Arteriais")
         self.resize(1200, 750)
         self.setStyleSheet("""
             QMainWindow { background: #f5f8fc; }
@@ -155,6 +155,7 @@ class MainWindow(QMainWindow):
         self._active_load_id = 0
         self._model_workers = []
         self._current_dimension = None
+        self._translation_actions = []
 
         self._create_interface()
         self._initialize_application()
@@ -179,7 +180,7 @@ class MainWindow(QMainWindow):
         sidebar_layout.setContentsMargins(18, 20, 18, 18)
         sidebar_layout.setSpacing(10)
 
-        title = QLabel("Arterial Graphics Lab")
+        title = QLabel("Laboratório de Gráficos Arteriais")
         title.setObjectName("appTitle")
         sidebar_layout.addWidget(title)
         sidebar_layout.addSpacing(10)
@@ -222,7 +223,7 @@ class MainWindow(QMainWindow):
         self.info_label.setWordWrap(True)
         sidebar_layout.addWidget(self.info_label)
 
-        color_map_title = QLabel("Mapa de color")
+        color_map_title = QLabel("Mapa de cores")
         color_map_title.setObjectName("sectionTitle")
         sidebar_layout.addWidget(color_map_title)
 
@@ -250,6 +251,67 @@ class MainWindow(QMainWindow):
         self._root_stack.addWidget(self._main_interface)
         self._root_stack.setCurrentWidget(self._loading_screen)
 
+    def _connect_transform_controls(self):
+        panel = self.visualization_surface.transform_panel
+        panel.translation_changed.connect(
+            lambda x, y, z: self.viewer_3d.set_transform_parameters(
+                (x, y, z),
+                tuple(slider.value() for slider in panel.rotation_sliders),
+                panel.scale_slider.value() / 100,
+            )
+        )
+        panel.rotation_changed.connect(
+            lambda x, y, z: self.viewer_3d.set_transform_parameters(
+                tuple(
+                    slider.value() / 100
+                    for slider in panel.translation_sliders
+                ),
+                (x, y, z),
+                panel.scale_slider.value() / 100,
+            )
+        )
+        panel.scale_changed.connect(
+            lambda factor: self.viewer_3d.set_transform_parameters(
+                tuple(
+                    slider.value() / 100
+                    for slider in panel.translation_sliders
+                ),
+                tuple(slider.value() for slider in panel.rotation_sliders),
+                factor,
+            )
+        )
+        panel.camera_view_changed.connect(self.viewer_3d.set_camera_view)
+        panel.projection_changed.connect(
+            self.viewer_3d.set_parallel_projection
+        )
+        panel.reset_requested.connect(self.viewer_3d.reset_transform)
+
+        translations = (
+            ("Alt+Left", 0, -10),
+            ("Alt+Right", 0, 10),
+            ("Alt+Down", 1, -10),
+            ("Alt+Up", 1, 10),
+            ("Alt+PageDown", 2, -10),
+            ("Alt+PageUp", 2, 10),
+        )
+
+        def translation_shortcut(axis, step):
+            return lambda: self._move_translation_slider(axis, step)
+
+        for shortcut, axis, step in translations:
+            action = QAction(self)
+            action.setShortcut(shortcut)
+            action.setShortcutContext(Qt.ShortcutContext.WindowShortcut)
+            action.triggered.connect(translation_shortcut(axis, step))
+            self.addAction(action)
+            self._translation_actions.append(action)
+
+    def _move_translation_slider(self, axis, step):
+        slider = self.visualization_surface.transform_panel.translation_sliders[
+            axis
+        ]
+        slider.setValue(slider.value() + step)
+
     def _initialize_application(self):
         self._initialization_worker = _ApplicationInitializer(self)
         self._initialization_worker.ready.connect(self._finish_initialization)
@@ -267,6 +329,7 @@ class MainWindow(QMainWindow):
             self.visualization_surface.set_viewers(
                 self.viewer_2d, self.viewer_3d
             )
+            self._connect_transform_controls()
             self.visualization_surface.hide_loading()
             self.status_label.setText("Aplicação pronta para uso.")
             self._root_stack.setCurrentWidget(self._main_interface)
@@ -278,7 +341,7 @@ class MainWindow(QMainWindow):
         self._loading_screen.show_error(message)
         if self._initialization_worker.isRunning():
             self._initialization_worker.wait()
-        QMessageBox.critical(self, "Falha ao iniciar", message)
+        QMessageBox.critical(self, "Falha na inicialização", message)
         self.close()
 
     def center_on_primary_screen(self):
@@ -428,11 +491,16 @@ class MainWindow(QMainWindow):
                     self.viewer_3d
                 )
                 self.viewer_3d.show_model(model, color_map)
+                self.viewer_3d.set_camera_view("isometric")
+                self.viewer_3d.set_parallel_projection(False)
+            self.visualization_surface.transform_panel.reset_controls()
+            for action in self._translation_actions:
+                action.setEnabled(dimension == 3)
             self.visualization_surface.set_model_dimension(dimension)
 
             info = (
                 f"Arquivo: {Path(file_path).name}\n\n"
-                f"Puntos (vértices): {statistics['points']}\n"
+                f"Pontos (vértices): {statistics['points']}\n"
                 f"Segmentos: {statistics['segments']}\n\n"
                 f"Atributos: {statistics['attributes']}"
             )
@@ -460,7 +528,7 @@ class MainWindow(QMainWindow):
         if self._current_dimension == 2:
             self.viewer_2d.show_model(model, color_map)
         else:
-            self.viewer_3d.show_model(model, color_map)
+            self.viewer_3d.set_color_map(color_map)
 
     def _model_load_failed(self, request_id, file_path, error):
         if request_id != self._active_load_id:

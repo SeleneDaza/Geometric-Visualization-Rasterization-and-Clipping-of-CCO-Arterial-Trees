@@ -1,31 +1,40 @@
-# Geometric Visualization, Rasterization and Clipping of CCO Arterial Trees
+# Visualização Geométrica, Rasterização e Recorte de Árvores Arteriais CCO
 
-Aplicación de escritorio para cargar y visualizar árboles arteriales CCO en
-formato VTK, en 2D o 3D.
+Aplicativo para carregar e visualizar árvores arteriais CCO em formato VTK,
+em 2D ou 3D.
 
-## Requisitos funcionales
+## Requisitos funcionais
 
-- **RF01 — Carga y parseo:** PyVista carga archivos `.vtk`; la dimensión
-  geométrica se determina a partir de sus puntos.
-- **RF02 — Métricas:** se muestran puntos/vértices, segmentos geométricos y el
-  rango del atributo de radio `raio`, cuando está disponible.
-- **RF03 — Primitivas:** las redes se dibujan como segmentos de línea en los
-  visualizadores 2D y 3D.
-- **RF04 — Color y grosor:** el radio de cada segmento controla su color y
-  grosor. El selector permite elegir Viridis, HSV o RGB (azul-verde-rojo).
+- **RF01 — Carregamento e análise:** o PyVista carrega arquivos `.vtk`; a
+  dimensão geométrica é determinada a partir dos pontos.
+- **RF02 — Métricas:** são exibidos o número de pontos/vértices, segmentos
+  geométricos e o intervalo do atributo de raio `raio`, quando disponível.
+- **RF03 — Primitivas:** as redes são desenhadas como segmentos de linha nos
+  visualizadores 2D e 3D.
+- **RF04 — Cor e espessura:** o raio de cada segmento controla sua cor e
+  espessura. É possível escolher os mapas Viridis, HSV ou RGB (azul-verde-
+  vermelho).
+- **RF05 — Transformações afins interativas:** no modo 3D, o painel lateral
+  permite transladar, rotacionar e redimensionar o modelo com controles
+  deslizantes. As setas com `Alt` também deslocam a cena.
+- **RF06 — Controle do observador:** o controle deslizante da câmera permite
+  escolher entre as vistas isométrica, superior, frontal e lateral. O mouse
+  também permite orbitar, deslocar e aproximar ou afastar a câmera.
+- **RF07 — Projeções:** a opção «Projeção ortográfica» alterna entre projeção
+  ortográfica e perspectiva; a perspectiva é usada inicialmente.
 
-## Ejecución
+## Execução
 
-Instala las dependencias de `requirements.txt` y ejecuta desde la raíz:
+Instale as dependências de `requirements.txt` e execute a partir da raiz:
 
 ```powershell
 python src\main.py
 ```
 
-Los modelos de ejemplo están en `data\2D` y `data\3D`. También se pueden añadir
-archivos `.vtk` o carpetas desde la aplicación.
+Os modelos de exemplo estão em `data\2D` e `data\3D`. Também é possível
+adicionar arquivos `.vtk` ou pastas pelo aplicativo.
 
-## Pruebas
+## Testes
 
 ```powershell
 python -m unittest discover -s tests
