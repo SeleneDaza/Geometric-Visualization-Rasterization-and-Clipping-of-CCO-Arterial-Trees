@@ -1,3 +1,4 @@
+from PySide6.QtGui import QAction
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFrame,
@@ -20,6 +21,8 @@ class VisualizationSurface(QWidget):
         super().__init__(parent)
         self._is_2d = False
         self._panel_open = False
+        self._inspection_active = False
+        self._viewer_2d = None
 
         self._content_splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self._content_splitter.setHandleWidth(6)
@@ -55,6 +58,14 @@ class VisualizationSurface(QWidget):
         self.didactic_panel.hide()
         self.transform_panel.hide()
 
+        bresenham_module = self.didactic_panel.bresenham_module
+        bresenham_module.inspection_requested.connect(
+            self.set_artery_inspection_active
+        )
+        bresenham_module.inspection_pixel_changed.connect(
+            self._set_inspection_pixel
+        )
+
         self.didactic_button = QPushButton("Modo didático", self)
         self.didactic_button.setFixedSize(144, 38)
         self.didactic_button.setStyleSheet("""
@@ -69,6 +80,17 @@ class VisualizationSurface(QWidget):
         """)
         self.didactic_button.clicked.connect(self.toggle_didactic_panel)
         self.didactic_button.hide()
+
+        self.inspector_shortcut = QAction("Inspecionar artéria", self)
+        self.inspector_shortcut.setShortcut("I")
+        self.inspector_shortcut.setShortcutContext(
+            Qt.ShortcutContext.WindowShortcut
+        )
+        self.inspector_shortcut.triggered.connect(
+            self.toggle_artery_inspector
+        )
+        self.inspector_shortcut.setEnabled(False)
+        self.addAction(self.inspector_shortcut)
 
         self.transform_button = QPushButton("Transformar cena", self)
         self.transform_button.setFixedSize(168, 38)
@@ -111,9 +133,19 @@ class VisualizationSurface(QWidget):
         self.viewer_container.addWidget(viewer_2d)
         self.viewer_container.addWidget(viewer_3d)
         self.viewer_container.setCurrentWidget(viewer_2d)
+        self._viewer_2d = viewer_2d
+        viewer_2d.artery_selected.connect(
+            self.didactic_panel.bresenham_module.set_artery_selection
+        )
+        viewer_2d.artery_selected.connect(
+            viewer_2d.set_inspection_selection
+        )
 
     def set_model_dimension(self, dimension):
+        if self._inspection_active:
+            self.set_artery_inspection_active(False)
         self._is_2d = dimension == 2
+        self.inspector_shortcut.setEnabled(self._is_2d)
         if self._panel_open:
             self.didactic_panel.hide()
             self.transform_panel.hide()
@@ -166,6 +198,8 @@ class VisualizationSurface(QWidget):
     def close_didactic_panel(self):
         if not self._panel_open:
             return
+        if self._inspection_active:
+            self.set_artery_inspection_active(False)
         self._panel_open = False
         self.didactic_panel.hide()
         self.didactic_button.setVisible(self._is_2d)
@@ -197,6 +231,31 @@ class VisualizationSurface(QWidget):
         self._panel_open = False
         self.transform_panel.hide()
         self.transform_button.setVisible(not self._is_2d)
+
+    def toggle_artery_inspector(self):
+        if not self._is_2d or self._viewer_2d is None:
+            return
+        self.set_artery_inspection_active(not self._inspection_active)
+
+    def set_artery_inspection_active(self, active):
+        active = bool(active)
+        if active == self._inspection_active:
+            return
+        if active:
+            if not self._is_2d or self._viewer_2d is None:
+                return
+            self.open_didactic_panel()
+            self._viewer_2d.set_artery_inspection_enabled(True)
+        else:
+            if self._viewer_2d is not None:
+                self._viewer_2d.set_artery_inspection_enabled(False)
+                self._viewer_2d.set_inspection_selection(None)
+        self._inspection_active = active
+        self.didactic_panel.bresenham_module.set_inspection_active(active)
+
+    def _set_inspection_pixel(self, pixel):
+        if self._viewer_2d is not None:
+            self._viewer_2d.set_inspection_pixel(pixel)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

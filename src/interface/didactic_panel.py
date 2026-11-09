@@ -1,18 +1,22 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QFrame,
     QGridLayout,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QScrollArea,
     QSpinBox,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
-from rasterization.bresenham import bresenham_line
+from rasterization.bresenham import trace_bresenham_line
 
 
 class RasterizationCanvas(QWidget):
@@ -22,11 +26,13 @@ class RasterizationCanvas(QWidget):
         self._start = None
         self._end = None
         self._pixels = []
+        self._active_pixel = None
 
-    def set_line(self, start, end, pixels):
+    def set_line(self, start, end, pixels, active_pixel=None):
         self._start = start
         self._end = end
         self._pixels = pixels
+        self._active_pixel = active_pixel
         self.update()
 
     def paintEvent(self, event):
@@ -116,23 +122,60 @@ class RasterizationCanvas(QWidget):
                 f"({x}, {y})",
             )
 
+        if self._active_pixel is not None:
+            point_x, point_y = cell_rect(*self._active_pixel)
+            radius = max(4.0, cell_size * 0.38)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(
+                QPen(QColor("#e5484d"), max(2, int(cell_size * 0.08)))
+            )
+            painter.drawEllipse(
+                int(point_x + cell_size / 2 - radius),
+                int(point_y + cell_size / 2 - radius),
+                int(radius * 2),
+                int(radius * 2),
+            )
+
 
 class BresenhamModule(QFrame):
+    inspection_requested = Signal(bool)
+    inspection_pixel_changed = Signal(object)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("moduleCard")
+        self._inspection_active = False
+        self._artery_selection = None
+        self._steps = []
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 14, 14, 14)
 
+        heading_row = QHBoxLayout()
         heading = QLabel("Algoritmo de Bresenham")
         heading.setObjectName("moduleHeading")
-        layout.addWidget(heading)
+        heading_row.addWidget(heading)
+        heading_row.addStretch()
+        self.inspect_button = QPushButton("Inspecionar artéria")
+        self.inspect_button.setToolTip(
+            "Ativa a seleção de uma artéria no visualizador 2D (I)"
+        )
+        self.inspect_button.clicked.connect(
+            lambda: self.inspection_requested.emit(not self._inspection_active)
+        )
+        heading_row.addWidget(self.inspect_button)
+        layout.addLayout(heading_row)
         description = QLabel(
-            "Escolha os pontos inicial e final. A visualização destaca "
-            "os pixels retornados pelo algoritmo."
+            "Escolha os pontos inicial e final para acompanhar como o "
+            "algoritmo de Bresenham decide quais pixels desenhar."
         )
         description.setWordWrap(True)
         layout.addWidget(description)
+
+        self.selection_details = QLabel()
+        self.selection_details.setObjectName("mutedText")
+        self.selection_details.setWordWrap(True)
+        self.selection_details.hide()
+        layout.addWidget(self.selection_details)
 
         coordinates = QGridLayout()
         self.x0_input = self._coordinate_input(0)
@@ -166,12 +209,34 @@ class BresenhamModule(QFrame):
         layout.addWidget(self.pixel_output)
 
         self.decision_info = QLabel(
-            "A implementação atual fornece os pixels selecionados, mas não "
-            "registra a evolução da variável de decisão."
+            "O erro e o valor 2 × erro determinam o próximo deslocamento. "
+            "Na última iteração, não há nova decisão."
         )
         self.decision_info.setWordWrap(True)
         self.decision_info.setObjectName("mutedText")
         layout.addWidget(self.decision_info)
+
+        self.iteration_table = QTableWidget(0, 4)
+        self.iteration_table.setHorizontalHeaderLabels(
+            ("Iteração", "Pixel pintado", "Erro", "2 × erro")
+        )
+        self.iteration_table.verticalHeader().setVisible(False)
+        self.iteration_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.iteration_table.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+        self.iteration_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
+        self.iteration_table.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self.iteration_table.setAlternatingRowColors(True)
+        self.iteration_table.setMinimumHeight(190)
+        self.iteration_table.cellClicked.connect(self._select_iteration)
+        layout.addWidget(self.iteration_table)
 
     @staticmethod
     def _coordinate_input(value):
@@ -185,7 +250,8 @@ class BresenhamModule(QFrame):
     def rasterize(self):
         start = (self.x0_input.value(), self.y0_input.value())
         end = (self.x1_input.value(), self.y1_input.value())
-        pixels = bresenham_line(*start, *end)
+        self._steps = trace_bresenham_line(*start, *end)
+        pixels = [step.pixel for step in self._steps]
         self.canvas.set_line(start, end, pixels)
 
         displayed_pixels = pixels[:100]
@@ -193,8 +259,75 @@ class BresenhamModule(QFrame):
         if len(pixels) > len(displayed_pixels):
             pixel_text += f", ... ({len(pixels) - len(displayed_pixels)} pixels restantes)"
         self.pixel_output.setText(
-            f"{len(pixels)} pixels selecionados:\n{pixel_text}"
+            f"{len(pixels)} pixels rasterizados:\n{pixel_text}"
         )
+        self.iteration_table.setRowCount(len(self._steps))
+        for row, step in enumerate(self._steps):
+            values = (
+                str(step.iteration),
+                str(step.pixel),
+                str(step.error),
+                "-" if step.doubled_error is None else str(step.doubled_error),
+            )
+            for column, value in enumerate(values):
+                self.iteration_table.setItem(
+                    row, column, QTableWidgetItem(value)
+                )
+        self.iteration_table.selectRow(0)
+        if self._artery_selection is not None and self._steps:
+            self.canvas.set_line(start, end, pixels, self._steps[0].pixel)
+            self.inspection_pixel_changed.emit(self._steps[0].pixel)
+
+    def set_inspection_active(self, active):
+        self._inspection_active = bool(active)
+        self.inspect_button.setText(
+            "Cancelar lupa"
+            if self._inspection_active else "Inspecionar artéria"
+        )
+        self.selection_details.setVisible(self._inspection_active)
+        self.selection_details.setText(
+            "Clique em uma artéria no visualizador 2D para inspecionar seus "
+            "pixels. Selecione uma linha para destacá-la no modelo."
+            if self._inspection_active else ""
+        )
+        if not self._inspection_active:
+            self.set_artery_selection(None)
+
+    def set_artery_selection(self, selection):
+        self._artery_selection = selection
+        if selection is None:
+            self.inspection_pixel_changed.emit(None)
+            if self._inspection_active:
+                self.selection_details.setText(
+                    "Clique em uma artéria no visualizador 2D para "
+                    "inspecionar seus pixels. Selecione uma linha para "
+                    "destacá-la no modelo."
+                )
+            return
+
+        start = selection["start_grid"]
+        end = selection["end_grid"]
+        self.x0_input.setValue(start[0])
+        self.y0_input.setValue(start[1])
+        self.x1_input.setValue(end[0])
+        self.y1_input.setValue(end[1])
+        self.selection_details.setText(
+            f"Artéria {selection['cell_id'] + 1} · grade {start} → {end}"
+        )
+        self.rasterize()
+
+    def _select_iteration(self, row, column):
+        if row >= len(self._steps):
+            return
+        pixel = self._steps[row].pixel
+        if self._artery_selection is not None:
+            self.canvas.set_line(
+                self._artery_selection["start_grid"],
+                self._artery_selection["end_grid"],
+                [step.pixel for step in self._steps],
+                pixel,
+            )
+            self.inspection_pixel_changed.emit(pixel)
 
 
 class DidacticPanel(QFrame):
@@ -272,7 +405,8 @@ class DidacticPanel(QFrame):
         section_title = QLabel("Rasterização de linhas")
         section_title.setObjectName("moduleHeading")
         content_layout.addWidget(section_title)
-        content_layout.addWidget(BresenhamModule())
+        self.bresenham_module = BresenhamModule()
+        content_layout.addWidget(self.bresenham_module)
 
         future_modules = (
             "Preenchimento Scanline",
