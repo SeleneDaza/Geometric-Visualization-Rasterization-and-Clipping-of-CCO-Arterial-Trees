@@ -1,4 +1,5 @@
 
+import numpy as np
 import pyvista as pv
 
 
@@ -11,9 +12,18 @@ class ModelLoader:
         return self.model
 
     def get_dimension(self):
-        bounds = self.model.bounds
-        z_extent = bounds[5] - bounds[4]
-        return 2 if abs(z_extent) < 1e-8 else 3
+        points = np.asarray(self.model.points, dtype=float)
+        if points.size == 0:
+            return 2
+
+        centered_points = points - points.mean(axis=0)
+        singular_values = np.linalg.svd(centered_points, compute_uv=False)
+        if singular_values.size == 0:
+            return 2
+
+        tolerance = max(singular_values[0] * 1e-8, 1e-12)
+        geometric_rank = np.count_nonzero(singular_values > tolerance)
+        return 3 if geometric_rank >= 3 else 2
 
     def get_statistics(self):
         return {
