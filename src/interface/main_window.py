@@ -154,6 +154,7 @@ class MainWindow(QMainWindow):
         self._loader_class = None
         self._active_load_id = 0
         self._model_workers = []
+        self._current_dimension = None
 
         self._create_interface()
         self._initialize_application()
@@ -220,6 +221,19 @@ class MainWindow(QMainWindow):
         self.info_label = QLabel("Nenhum modelo carregado.")
         self.info_label.setWordWrap(True)
         sidebar_layout.addWidget(self.info_label)
+
+        color_map_title = QLabel("Mapa de color")
+        color_map_title.setObjectName("sectionTitle")
+        sidebar_layout.addWidget(color_map_title)
+
+        self.color_map_selector = QComboBox()
+        self.color_map_selector.addItem("Viridis", "viridis")
+        self.color_map_selector.addItem("HSV", "hsv")
+        self.color_map_selector.addItem("RGB", "rgb")
+        self.color_map_selector.currentIndexChanged.connect(
+            self._update_color_map
+        )
+        sidebar_layout.addWidget(self.color_map_selector)
         sidebar_layout.addStretch()
 
         self.visualization_surface = VisualizationSurface()
@@ -402,22 +416,24 @@ class MainWindow(QMainWindow):
             return
         try:
             self.loader = loader
+            self._current_dimension = dimension
+            color_map = self.color_map_selector.currentData()
             if dimension == 2:
                 self.visualization_surface.viewer_container.setCurrentWidget(
                     self.viewer_2d
                 )
-                self.viewer_2d.show_model(model)
+                self.viewer_2d.show_model(model, color_map)
             else:
                 self.visualization_surface.viewer_container.setCurrentWidget(
                     self.viewer_3d
                 )
-                self.viewer_3d.show_model(model)
+                self.viewer_3d.show_model(model, color_map)
             self.visualization_surface.set_model_dimension(dimension)
 
             info = (
                 f"Arquivo: {Path(file_path).name}\n\n"
-                f"Pontos: {statistics['points']}\n"
-                f"Linhas: {statistics['lines']}\n\n"
+                f"Puntos (vértices): {statistics['points']}\n"
+                f"Segmentos: {statistics['segments']}\n\n"
                 f"Atributos: {statistics['attributes']}"
             )
             if radius_range is not None:
@@ -434,6 +450,17 @@ class MainWindow(QMainWindow):
             )
         finally:
             self.visualization_surface.hide_loading()
+
+    def _update_color_map(self):
+        if self.loader is None or self._current_dimension is None:
+            return
+
+        model = self.loader.get_model()
+        color_map = self.color_map_selector.currentData()
+        if self._current_dimension == 2:
+            self.viewer_2d.show_model(model, color_map)
+        else:
+            self.viewer_3d.show_model(model, color_map)
 
     def _model_load_failed(self, request_id, file_path, error):
         if request_id != self._active_load_id:

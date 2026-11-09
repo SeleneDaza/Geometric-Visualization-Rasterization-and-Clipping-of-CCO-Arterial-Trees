@@ -29,19 +29,36 @@ class ModelLoader:
         return {
             "points": self.model.n_points,
             "lines": self.model.n_lines,
+            "segments": self._count_segments(),
             "attributes": list(self.model.cell_data.keys())
         }
 
+    def _count_segments(self):
+        if not isinstance(self.model, pv.PolyData):
+            return self.model.n_lines
+
+        connectivity = np.asarray(self.model.lines, dtype=np.int64)
+        segments = 0
+        offset = 0
+        while offset < connectivity.size:
+            point_count = int(connectivity[offset])
+            segments += max(0, point_count - 1)
+            offset += point_count + 1
+        return segments
+
     def get_radii(self):
-        return self.model.cell_data["raio"]
+        return np.asarray(self.model.cell_data["raio"], dtype=float)
 
     def get_radius_range(self):
         if "raio" not in self.model.cell_data:
             return None
 
         radii = self.get_radii()
+        radii = radii[np.isfinite(radii)]
+        if radii.size == 0:
+            return None
 
         return {
-            "min": radii.min(),
-            "max": radii.max()
+            "min": float(radii.min()),
+            "max": float(radii.max())
         }
