@@ -76,6 +76,54 @@ class Viewer2D(QtInteractor):
     def _apply_anti_aliasing(self):
         set_anti_aliasing(self, self._anti_aliasing_enabled)
 
+    def wheelEvent(self, event):
+        horizontal_delta = event.pixelDelta().x()
+        if horizontal_delta == 0:
+            horizontal_delta = event.angleDelta().x() / 3
+
+        if self._model is not None and horizontal_delta:
+            self._pan_horizontally(horizontal_delta)
+            event.accept()
+            return
+
+        super().wheelEvent(event)
+
+    def _pan_horizontally(self, pixel_delta):
+        camera = self.renderer.GetActiveCamera()
+        camera_direction = np.asarray(
+            camera.GetDirectionOfProjection(), dtype=float
+        )
+        camera_up = np.asarray(camera.GetViewUp(), dtype=float)
+        camera_right = np.cross(camera_direction, camera_up)
+        camera_right /= np.linalg.norm(camera_right)
+
+        viewport_height = max(1, self.height())
+        if camera.GetParallelProjection():
+            world_units_per_pixel = (
+                2 * camera.GetParallelScale() / viewport_height
+            )
+        else:
+            camera_distance = np.linalg.norm(
+                np.asarray(camera.GetFocalPoint())
+                - np.asarray(camera.GetPosition())
+            )
+            world_units_per_pixel = (
+                2
+                * camera_distance
+                * np.tan(np.deg2rad(camera.GetViewAngle() / 2))
+                / viewport_height
+            )
+
+        camera_offset = -camera_right * pixel_delta * world_units_per_pixel
+        camera.SetPosition(
+            np.asarray(camera.GetPosition()) + camera_offset
+        )
+        camera.SetFocalPoint(
+            np.asarray(camera.GetFocalPoint()) + camera_offset
+        )
+        self.renderer.ResetCameraClippingRange()
+        self.render()
+
     def set_artery_inspection_enabled(self, enabled):
         enabled = bool(enabled)
         if enabled == self._inspection_enabled:
