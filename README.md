@@ -44,6 +44,10 @@ em 2D ou 3D.
   Cohen–Sutherland ou Liang–Barsky no campo «Algoritmo». A escolha pode ser
   alterada com o recorte ativo, e as artérias são recalculadas imediatamente
   para a mesma janela retangular.
+- **RF13 — Alternância de vista do recorte:** pressione `E` ou use o botão
+  «Destacar exteriores (E)» para alternar, independentemente do modo de
+  desenho, o destaque laranja dos trechos externos à janela. A tecla `C`
+  continua controlando apenas o desenho do recorte.
 
 ## Execução
 
@@ -64,6 +68,8 @@ No modo 2D, pressione `C` ou abra «Modo didático» e selecione «Desenhar
 janela (C)»; escolha «Cohen–Sutherland» ou «Liang–Barsky» e arraste sobre o
 modelo para recortar os segmentos em tempo real. O algoritmo pode ser trocado
 com uma janela já desenhada.
+Com a janela definida, pressione `E` para alternar o destaque laranja dos
+trechos eliminados/externos; essa tecla não ativa nem desativa o modo de desenho.
 Para o Scanline, pressione `R`, marque pelo menos três vértices no modelo e
 selecione «Finalizar polígono». O contorno muda de cor e fica bloqueado; use
 «Limpar ROI» para recomeçar. Os módulos didáticos são expansíveis e começam

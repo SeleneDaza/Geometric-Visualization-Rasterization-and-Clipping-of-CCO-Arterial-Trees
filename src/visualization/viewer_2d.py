@@ -4,8 +4,14 @@ import pyvista as pv
 from pyvistaqt import QtInteractor
 from vtkmodules.vtkRenderingCore import vtkCellPicker
 
-from clipping.cohen_sutherland import clip_polydata
+from clipping.cohen_sutherland import (
+    clip_polydata,
+    clip_polydata_outside,
+)
 from clipping.liang_barsky import clip_polydata as clip_polydata_liang_barsky
+from clipping.liang_barsky import (
+    clip_polydata_outside as clip_polydata_outside_liang_barsky,
+)
 from visualization.artery_inspector import (
     closest_cell_segment,
     original_cell_id,
@@ -52,12 +58,14 @@ class Viewer2D(QtInteractor):
         self._model_actors = []
         self._clipping_enabled = False
         self._clipping_algorithm = "cohen_sutherland"
+        self._clipping_exterior_enabled = False
         self._clip_dragging = False
         self._clip_start = None
         self._clip_window = None
         self._clip_display_depth = 0.0
         self._clip_window_actor = None
         self._clipped_actors = []
+        self._exterior_actors = []
         self._cell_picker = vtkCellPicker()
         self._cell_picker.SetTolerance(0.01)
 
@@ -78,6 +86,7 @@ class Viewer2D(QtInteractor):
         self.clear()
         self._model_actors.clear()
         self._clipped_actors.clear()
+        self._exterior_actors.clear()
         self._clip_window_actor = None
         self._clip_start = None
         self._clip_window = None
@@ -113,6 +122,11 @@ class Viewer2D(QtInteractor):
             return
         self._clipping_algorithm = algorithm
         if self._clipping_enabled and self._clip_window is not None:
+            self._apply_clipping_window(self._clip_window)
+
+    def set_clipping_exterior_enabled(self, enabled):
+        self._clipping_exterior_enabled = bool(enabled)
+        if self._clip_window is not None:
             self._apply_clipping_window(self._clip_window)
 
     def set_clipping_enabled(self, enabled):
@@ -216,6 +230,10 @@ class Viewer2D(QtInteractor):
             "cohen_sutherland": clip_polydata,
             "liang_barsky": clip_polydata_liang_barsky,
         }
+        clip_polydata_outside_by_algorithm = {
+            "cohen_sutherland": clip_polydata_outside,
+            "liang_barsky": clip_polydata_outside_liang_barsky,
+        }
         clipped_model = clip_polydata_by_algorithm[self._clipping_algorithm](
             self._model,
             window,
@@ -230,6 +248,20 @@ class Viewer2D(QtInteractor):
                 self._color_map,
                 show_scalar_bar=False,
             )
+        if self._clipping_exterior_enabled:
+            exterior_model = clip_polydata_outside_by_algorithm[
+                self._clipping_algorithm
+            ](self._model, window)
+            if exterior_model.n_cells:
+                self._exterior_actors = [
+                    self.add_mesh(
+                        exterior_model,
+                        color="#d95f02",
+                        line_width=4,
+                        render_lines_as_tubes=True,
+                        name="arterial_clipping_exterior",
+                    )
+                ]
 
         z = float(self._model.center[2])
         rectangle = pv.PolyData(
@@ -261,6 +293,9 @@ class Viewer2D(QtInteractor):
         for actor in self._clipped_actors:
             self.remove_actor(actor)
         self._clipped_actors.clear()
+        for actor in self._exterior_actors:
+            self.remove_actor(actor)
+        self._exterior_actors.clear()
         if self._clip_window_actor is not None:
             self.remove_actor(self._clip_window_actor)
             self._clip_window_actor = None

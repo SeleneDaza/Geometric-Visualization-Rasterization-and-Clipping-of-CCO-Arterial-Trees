@@ -1,6 +1,9 @@
 import numpy as np
 
-from ._polydata import clip_polydata as _clip_polydata
+from ._polydata import (
+    clip_polydata as _clip_polydata,
+    clip_polydata_outside as _clip_polydata_outside,
+)
 
 
 def clip_segment(start, end, window):
@@ -47,3 +50,8 @@ def clip_segment(start, end, window):
 def clip_polydata(model, window):
     """Return a line mesh containing the portions inside a rectangular window."""
     return _clip_polydata(model, window, clip_segment)
+
+
+def clip_polydata_outside(model, window):
+    """Return a line mesh containing the portions outside a rectangular window."""
+    return _clip_polydata_outside(model, window, clip_segment)

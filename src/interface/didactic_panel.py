@@ -385,6 +385,7 @@ class BresenhamModule(QFrame):
 class ArterialClippingModule(QFrame):
     mode_requested = Signal(bool)
     algorithm_changed = Signal(str)
+    exterior_highlight_requested = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -424,9 +425,30 @@ class ArterialClippingModule(QFrame):
         algorithm_row.addWidget(self.algorithm_selector, stretch=1)
         layout.addLayout(algorithm_row)
 
+        self.exterior_button = QPushButton("Destacar exteriores (E)")
+        self.exterior_button.setCheckable(True)
+        self.exterior_button.setToolTip(
+            "Alterna o destaque dos segmentos fora da janela (E), "
+            "sem desativar o modo de recorte."
+        )
+        self.exterior_button.setStyleSheet("""
+            QPushButton:checked {
+                background: #fff1e8;
+                border-color: #d95f02;
+                color: #8f3700;
+                font-weight: 600;
+            }
+        """)
+        self.exterior_button.toggled.connect(
+            self.exterior_highlight_requested.emit
+        )
+        layout.addWidget(self.exterior_button)
+
         description = QLabel(
             "Escolha o algoritmo e arraste sobre a rede para desenhar a "
-            "janela retangular. As artérias são recortadas em tempo real."
+            "janela retangular. As artérias são recortadas em tempo real. "
+            "Pressione E para destacar os segmentos externos sem alterar "
+            "o modo de desenho."
         )
         description.setWordWrap(True)
         layout.addWidget(description)
@@ -452,6 +474,16 @@ class ArterialClippingModule(QFrame):
             "Arraste na visualização para definir a janela retangular."
             if self._mode_active else "Modo de recorte desativado."
         )
+
+    def set_exterior_highlight_active(self, active):
+        active = bool(active)
+        previous = self.exterior_button.blockSignals(True)
+        self.exterior_button.setChecked(active)
+        self.exterior_button.setText(
+            "Ocultar exteriores (E)"
+            if active else "Destacar exteriores (E)"
+        )
+        self.exterior_button.blockSignals(previous)
 
     def set_clipping_result(self, result):
         if not self._mode_active or result is None:

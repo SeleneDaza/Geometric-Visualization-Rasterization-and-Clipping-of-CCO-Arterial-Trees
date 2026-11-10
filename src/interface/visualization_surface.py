@@ -82,7 +82,11 @@ class VisualizationSurface(QWidget):
         self.didactic_panel.clipping_module.algorithm_changed.connect(
             self.set_clipping_algorithm
         )
+        self.didactic_panel.clipping_module.exterior_highlight_requested.connect(
+            self.set_clipping_exterior_active
+        )
         self._clipping_algorithm = self.didactic_panel.clipping_module.algorithm
+        self._clipping_exterior_enabled = False
 
         self.didactic_button = QPushButton("Modo didático", self)
         self.didactic_button.setFixedSize(144, 38)
@@ -127,6 +131,20 @@ class VisualizationSurface(QWidget):
         )
         self.clipping_shortcut.setEnabled(False)
         self.addAction(self.clipping_shortcut)
+        self.clipping_exterior_shortcut = QAction(
+            "Alternar destaque dos segmentos externos",
+            self,
+        )
+        self.clipping_exterior_shortcut.setShortcut("E")
+        self.clipping_exterior_shortcut.setShortcutContext(
+            Qt.ShortcutContext.WindowShortcut
+        )
+        self.clipping_exterior_shortcut.setCheckable(True)
+        self.clipping_exterior_shortcut.toggled.connect(
+            self.set_clipping_exterior_active
+        )
+        self.clipping_exterior_shortcut.setEnabled(False)
+        self.addAction(self.clipping_exterior_shortcut)
 
         self.transform_button = QPushButton("Transformar cena", self)
         self.transform_button.setFixedSize(168, 38)
@@ -171,6 +189,9 @@ class VisualizationSurface(QWidget):
         self.viewer_container.setCurrentWidget(viewer_2d)
         self._viewer_2d = viewer_2d
         viewer_2d.set_clipping_algorithm(self._clipping_algorithm)
+        viewer_2d.set_clipping_exterior_enabled(
+            self._clipping_exterior_enabled
+        )
         viewer_2d.artery_selected.connect(
             self.didactic_panel.bresenham_module.set_artery_selection
         )
@@ -194,6 +215,7 @@ class VisualizationSurface(QWidget):
         self.inspector_shortcut.setEnabled(self._is_2d)
         self.roi_shortcut.setEnabled(self._is_2d)
         self.clipping_shortcut.setEnabled(self._is_2d)
+        self.clipping_exterior_shortcut.setEnabled(self._is_2d)
         if self._panel_open:
             self.didactic_panel.hide()
             self.transform_panel.hide()
@@ -316,6 +338,22 @@ class VisualizationSurface(QWidget):
         self._clipping_algorithm = algorithm
         if self._viewer_2d is not None:
             self._viewer_2d.set_clipping_algorithm(algorithm)
+
+    def set_clipping_exterior_active(self, active):
+        active = bool(active)
+        if active == self._clipping_exterior_enabled:
+            return
+        self._clipping_exterior_enabled = active
+        self.didactic_panel.clipping_module.set_exterior_highlight_active(
+            self._clipping_exterior_enabled
+        )
+        self.clipping_exterior_shortcut.setChecked(
+            self._clipping_exterior_enabled
+        )
+        if self._viewer_2d is not None:
+            self._viewer_2d.set_clipping_exterior_enabled(
+                self._clipping_exterior_enabled
+            )
 
     def set_clipping_active(self, active):
         active = bool(active)

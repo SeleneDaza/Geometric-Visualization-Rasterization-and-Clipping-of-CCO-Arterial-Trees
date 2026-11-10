@@ -3,7 +3,11 @@ import unittest
 import numpy as np
 import pyvista as pv
 
-from src.clipping.cohen_sutherland import clip_polydata, clip_segment
+from src.clipping.cohen_sutherland import (
+    clip_polydata,
+    clip_polydata_outside,
+    clip_segment,
+)
 
 
 class CohenSutherlandTests(unittest.TestCase):
@@ -84,6 +88,38 @@ class CohenSutherlandTests(unittest.TestCase):
             [[0, 2, 0], [2, 2, 0], [2, 2, 0], [5, 2, 0]],
         )
         np.testing.assert_allclose(clipped.cell_data["raio"], [0.3, 0.3])
+
+    def test_extracts_outside_parts_and_preserves_source_radius(self):
+        model = pv.PolyData(
+            np.asarray(
+                [
+                    [-2.0, 2.0, 0.0],
+                    [8.0, 2.0, 0.0],
+                    [1.0, 1.0, 0.0],
+                    [3.0, 4.0, 0.0],
+                    [-2.0, 8.0, 0.0],
+                    [-1.0, 8.0, 0.0],
+                ]
+            ),
+            lines=np.asarray([2, 0, 1, 2, 2, 3, 2, 4, 5]),
+        )
+        model.cell_data["raio"] = np.asarray([0.1, 0.2, 0.3])
+
+        outside = clip_polydata_outside(model, (0, 0, 5, 5))
+
+        self.assertEqual(outside.n_cells, 3)
+        np.testing.assert_allclose(
+            outside.points,
+            [
+                [-2, 2, 0],
+                [0, 2, 0],
+                [5, 2, 0],
+                [8, 2, 0],
+                [-2, 8, 0],
+                [-1, 8, 0],
+            ],
+        )
+        np.testing.assert_allclose(outside.cell_data["raio"], [0.1, 0.1, 0.3])
 
 
 if __name__ == "__main__":

@@ -3,7 +3,11 @@ import unittest
 import numpy as np
 import pyvista as pv
 
-from src.clipping.liang_barsky import clip_polydata, clip_segment
+from src.clipping.liang_barsky import (
+    clip_polydata,
+    clip_polydata_outside,
+    clip_segment,
+)
 
 
 class LiangBarskyTests(unittest.TestCase):
@@ -39,6 +43,22 @@ class LiangBarskyTests(unittest.TestCase):
     def test_rejects_unordered_window(self):
         with self.assertRaises(ValueError):
             clip_segment((0, 0), (1, 1), (2, 0, 1, 1))
+
+    def test_extracts_outside_parts_of_a_crossing_segment(self):
+        model = pv.PolyData(
+            np.asarray([[-2.0, 2.0, 0.0], [8.0, 2.0, 0.0]]),
+            lines=np.asarray([2, 0, 1]),
+        )
+        model.cell_data["raio"] = np.asarray([0.4])
+
+        outside = clip_polydata_outside(model, (0, 0, 5, 5))
+
+        self.assertEqual(outside.n_cells, 2)
+        np.testing.assert_allclose(
+            outside.points,
+            [[-2, 2, 0], [0, 2, 0], [5, 2, 0], [8, 2, 0]],
+        )
+        np.testing.assert_allclose(outside.cell_data["raio"], [0.4, 0.4])
 
     def test_clips_polydata_and_preserves_radius(self):
         model = pv.PolyData(
