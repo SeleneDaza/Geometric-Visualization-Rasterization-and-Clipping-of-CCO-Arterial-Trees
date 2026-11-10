@@ -27,19 +27,23 @@ em 2D ou 3D.
   CCO. A grade de pixels e a tabela `pₖ` aparecem no módulo; ao escolher um
   passo, a artéria e o pixel em análise ficam destacados na figura. O módulo
   também permite informar manualmente os extremos de uma reta.
-- **RF09 — Rellenado de región de interés:** pressione `R` para ativar a
+- **RF09 — Preenchimento de região de interesse:** pressione `R` para ativar a
   delimitação de um polígono ROI com cliques no visualizador 2D. Ao finalizar,
   o contorno muda de cor, fica bloqueado para edição, e o preenchimento
   Scanline é animado com as tabelas ET/AET atualizadas a cada linha. Use
-  «Limpiar ROI» para remover o polígono. Os modos Bresenham (`I`) e ROI (`R`)
+  «Limpar ROI» para remover o polígono. Os modos Bresenham (`I`) e ROI (`R`)
   são mutuamente exclusivos: ativar um encerra automaticamente o outro.
 - **RF10 — Alternância de antialiasing:** a opção «Ativar antialiasing (FXAA)»
   na barra lateral liga ou desliga a filtragem de subpixel nos visualizadores
   2D e 3D, permitindo comparar as bordas das artérias com e sem suavização.
 - **RF11 — Recorte Cohen–Sutherland:** no modo didático 2D, a tecla `C` ou o
   botão «Desenhar janela (C)» ativa o recorte. Arraste sobre a rede para
-  sobrepor uma janela retangular; os segmentos visíveis dentro dela são
-  recalculados em tempo real pelo algoritmo Cohen–Sutherland.
+  definir uma janela retangular; os segmentos visíveis dentro dela são
+  recalculados em tempo real pelo algoritmo selecionado.
+- **RF12 — Recorte de artérias paramétrico:** no painel didático 2D, selecione
+  Cohen–Sutherland ou Liang–Barsky no campo «Algoritmo». A escolha pode ser
+  alterada com o recorte ativo, e as artérias são recalculadas imediatamente
+  para a mesma janela retangular.
 
 ## Execução
 
@@ -57,7 +61,9 @@ novamente ou «Fechar painel» para sair do modo.
 Use «Ativar antialiasing (FXAA)» na barra lateral para alternar a suavização
 das artérias em qualquer visualizador.
 No modo 2D, pressione `C` ou abra «Modo didático» e selecione «Desenhar
-janela (C)»; arraste sobre o modelo para recortar os segmentos em tempo real.
+janela (C)»; escolha «Cohen–Sutherland» ou «Liang–Barsky» e arraste sobre o
+modelo para recortar os segmentos em tempo real. O algoritmo pode ser trocado
+com uma janela já desenhada.
 Para o Scanline, pressione `R`, marque pelo menos três vértices no modelo e
 selecione «Finalizar polígono». O contorno muda de cor e fica bloqueado; use
 «Limpar ROI» para recomeçar. Os módulos didáticos são expansíveis e começam

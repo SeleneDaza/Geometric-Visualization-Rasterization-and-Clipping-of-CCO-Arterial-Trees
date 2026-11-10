@@ -5,6 +5,7 @@ from pyvistaqt import QtInteractor
 from vtkmodules.vtkRenderingCore import vtkCellPicker
 
 from clipping.cohen_sutherland import clip_polydata
+from clipping.liang_barsky import clip_polydata as clip_polydata_liang_barsky
 from visualization.artery_inspector import (
     closest_cell_segment,
     original_cell_id,
@@ -49,9 +50,11 @@ class Viewer2D(QtInteractor):
         self._roi_cell_size = 8.0
         self._color_map = "viridis"
         self._model_actors = []
-        self._cohen_sutherland_enabled = False
+        self._clipping_enabled = False
+        self._clipping_algorithm = "cohen_sutherland"
         self._clip_dragging = False
         self._clip_start = None
+        self._clip_window = None
         self._clip_display_depth = 0.0
         self._clip_window_actor = None
         self._clipped_actors = []
@@ -68,7 +71,7 @@ class Viewer2D(QtInteractor):
             self._scanline_observer = None
         self._inspection_enabled = False
         self._scanline_enabled = False
-        self._cohen_sutherland_enabled = False
+        self._clipping_enabled = False
         self._clip_dragging = False
         self._model = model
         self._color_map = color_map
@@ -77,6 +80,7 @@ class Viewer2D(QtInteractor):
         self._clipped_actors.clear()
         self._clip_window_actor = None
         self._clip_start = None
+        self._clip_window = None
         self.setCursor(Qt.CursorShape.ArrowCursor)
         self._selected_artery_actor = None
         self._inspection_marker_actor = None
@@ -102,14 +106,23 @@ class Viewer2D(QtInteractor):
     def _apply_anti_aliasing(self):
         set_anti_aliasing(self, self._anti_aliasing_enabled)
 
-    def set_cohen_sutherland_enabled(self, enabled):
+    def set_clipping_algorithm(self, algorithm):
+        if algorithm not in ("cohen_sutherland", "liang_barsky"):
+            raise ValueError(f"Algoritmo de recorte desconhecido: {algorithm}")
+        if algorithm == self._clipping_algorithm:
+            return
+        self._clipping_algorithm = algorithm
+        if self._clipping_enabled and self._clip_window is not None:
+            self._apply_clipping_window(self._clip_window)
+
+    def set_clipping_enabled(self, enabled):
         enabled = bool(enabled)
-        if enabled == self._cohen_sutherland_enabled:
+        if enabled == self._clipping_enabled:
             return
         if enabled and self._model is None:
             raise RuntimeError("Nenhum modelo 2D foi carregado.")
 
-        self._cohen_sutherland_enabled = enabled
+        self._clipping_enabled = enabled
         self._clip_dragging = False
         self._clip_start = None
         if enabled:
@@ -120,7 +133,8 @@ class Viewer2D(QtInteractor):
         self.setCursor(
             Qt.CursorShape.CrossCursor if enabled else Qt.CursorShape.ArrowCursor
         )
-        self._clear_cohen_sutherland_actors()
+        self._clear_clipping_actors()
+        self._clip_window = None
         for actor in self._model_actors:
             actor.SetVisibility(True)
         self.render()
@@ -129,7 +143,7 @@ class Viewer2D(QtInteractor):
 
     def mousePressEvent(self, event):
         if (
-            self._cohen_sutherland_enabled
+            self._clipping_enabled
             and event.button() == Qt.MouseButton.LeftButton
         ):
             self._clip_dragging = True
@@ -140,7 +154,7 @@ class Viewer2D(QtInteractor):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if self._cohen_sutherland_enabled:
+        if self._clipping_enabled:
             if self._clip_dragging:
                 self._update_clipping_window(event.pos())
             event.accept()
@@ -149,7 +163,7 @@ class Viewer2D(QtInteractor):
 
     def mouseReleaseEvent(self, event):
         if (
-            self._cohen_sutherland_enabled
+            self._clipping_enabled
             and event.button() == Qt.MouseButton.LeftButton
             and self._clip_dragging
         ):
@@ -184,7 +198,8 @@ class Viewer2D(QtInteractor):
         xmin, xmax = sorted((float(start[0]), float(end[0])))
         ymin, ymax = sorted((float(start[1]), float(end[1])))
         if xmin == xmax or ymin == ymax:
-            self._clear_cohen_sutherland_actors()
+            self._clear_clipping_actors()
+            self._clip_window = None
             for actor in self._model_actors:
                 actor.SetVisibility(True)
             self.render()
@@ -192,10 +207,22 @@ class Viewer2D(QtInteractor):
             return
 
         window = (xmin, ymin, xmax, ymax)
-        clipped_model = clip_polydata(self._model, window)
+        self._clip_window = window
+        self._apply_clipping_window(window)
+
+    def _apply_clipping_window(self, window):
+        xmin, ymin, xmax, ymax = window
+        clip_polydata_by_algorithm = {
+            "cohen_sutherland": clip_polydata,
+            "liang_barsky": clip_polydata_liang_barsky,
+        }
+        clipped_model = clip_polydata_by_algorithm[self._clipping_algorithm](
+            self._model,
+            window,
+        )
         for actor in self._model_actors:
             actor.SetVisibility(False)
-        self._clear_cohen_sutherland_actors()
+        self._clear_clipping_actors()
         if clipped_model.n_cells:
             self._clipped_actors = add_arterial_mesh(
                 self,
@@ -222,7 +249,7 @@ class Viewer2D(QtInteractor):
             color="#f4b400",
             line_width=2,
             render_lines_as_tubes=True,
-            name="cohen_sutherland_window",
+            name="arterial_clipping_window",
         )
         self.clipping_updated.emit({
             "window": window,
@@ -230,7 +257,7 @@ class Viewer2D(QtInteractor):
         })
         self.render()
 
-    def _clear_cohen_sutherland_actors(self):
+    def _clear_clipping_actors(self):
         for actor in self._clipped_actors:
             self.remove_actor(actor)
         self._clipped_actors.clear()

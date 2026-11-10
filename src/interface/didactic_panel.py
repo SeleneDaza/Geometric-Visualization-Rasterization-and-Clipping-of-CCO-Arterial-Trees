@@ -3,6 +3,7 @@ from PySide6.QtCore import QTimer
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QComboBox,
     QFrame,
     QGridLayout,
     QHeaderView,
@@ -381,8 +382,9 @@ class BresenhamModule(QFrame):
             self.inspection_pixel_changed.emit(pixel)
 
 
-class CohenSutherlandModule(QFrame):
+class ArterialClippingModule(QFrame):
     mode_requested = Signal(bool)
+    algorithm_changed = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -391,7 +393,7 @@ class CohenSutherlandModule(QFrame):
         layout.setContentsMargins(14, 14, 14, 14)
 
         heading_row = QHBoxLayout()
-        heading = QLabel("Recorte Cohen–Sutherland")
+        heading = QLabel("Recorte de artérias")
         heading.setObjectName("moduleHeading")
         heading_row.addWidget(heading)
         heading_row.addStretch()
@@ -405,9 +407,26 @@ class CohenSutherlandModule(QFrame):
         heading_row.addWidget(self.mode_button)
         layout.addLayout(heading_row)
 
+        algorithm_row = QHBoxLayout()
+        algorithm_row.addWidget(QLabel("Algoritmo:"))
+        self.algorithm_selector = QComboBox()
+        self.algorithm_selector.addItem(
+            "Cohen–Sutherland",
+            "cohen_sutherland",
+        )
+        self.algorithm_selector.addItem("Liang–Barsky", "liang_barsky")
+        self.algorithm_selector.setToolTip(
+            "Escolha o algoritmo usado para recortar as artérias."
+        )
+        self.algorithm_selector.currentIndexChanged.connect(
+            self._emit_algorithm_changed
+        )
+        algorithm_row.addWidget(self.algorithm_selector, stretch=1)
+        layout.addLayout(algorithm_row)
+
         description = QLabel(
-            "Ative o modo e arraste sobre a rede para desenhar a janela. "
-            "Os segmentos são recortados em tempo real enquanto você arrasta."
+            "Escolha o algoritmo e arraste sobre a rede para desenhar a "
+            "janela retangular. As artérias são recortadas em tempo real."
         )
         description.setWordWrap(True)
         layout.addWidget(description)
@@ -416,6 +435,13 @@ class CohenSutherlandModule(QFrame):
         self.status_label.setObjectName("mutedText")
         self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
+
+    @property
+    def algorithm(self):
+        return self.algorithm_selector.currentData()
+
+    def _emit_algorithm_changed(self, index):
+        self.algorithm_changed.emit(self.algorithm_selector.itemData(index))
 
     def set_mode_active(self, active):
         self._mode_active = bool(active)
@@ -460,13 +486,13 @@ class ScanlineModule(QFrame):
         layout.setContentsMargins(14, 14, 14, 14)
 
         heading_row = QHBoxLayout()
-        heading = QLabel("Rellenado Scanline (ET / AET)")
+        heading = QLabel("Preenchimento Scanline (ET / AET)")
         heading.setObjectName("moduleHeading")
         heading_row.addWidget(heading)
         heading_row.addStretch()
         self.mode_button = QPushButton("Delimitar ROI (R)")
         self.mode_button.setToolTip(
-            "Activa la delimitación de una ROI en el visualizador 2D (R)"
+            "Ativa a delimitação de uma ROI no visualizador 2D (R)"
         )
         self.mode_button.clicked.connect(
             lambda: self.mode_requested.emit(not self._mode_active)
@@ -475,8 +501,8 @@ class ScanlineModule(QFrame):
         layout.addLayout(heading_row)
 
         description = QLabel(
-            "Activa el modo y haz clic en la figura para marcar los vértices. "
-            "Finaliza el polígono para ver el relleno scanline paso a paso."
+            "Ative o modo e clique na figura para marcar os vértices. "
+            "Finalize o polígono para ver o preenchimento scanline passo a passo."
         )
         description.setWordWrap(True)
         layout.addWidget(description)
@@ -486,7 +512,7 @@ class ScanlineModule(QFrame):
         self.finish_button.clicked.connect(self.roi_finish_requested)
         self.finish_button.setEnabled(False)
         controls.addWidget(self.finish_button)
-        self.clear_button = QPushButton("Limpiar ROI")
+        self.clear_button = QPushButton("Limpar ROI")
         self.clear_button.clicked.connect(self._request_clear_roi)
         self.clear_button.setEnabled(False)
         controls.addWidget(self.clear_button)
@@ -542,8 +568,7 @@ class ScanlineModule(QFrame):
         self.finish_button.setEnabled(False)
         self.clear_button.setEnabled(active)
         self.status_label.setText(
-            "Haz clic en al menos tres puntos de la figura y finaliza el "
-            "polígono."
+            "Clique em pelo menos três pontos da figura e finalize o polígono."
             if active else "Modo de delimitación desactivado."
         )
 
@@ -599,8 +624,8 @@ class ScanlineModule(QFrame):
         )
         self._advance_fill()
         self.status_label.setText(
-            "ROI finalizada y bloqueada. Usa «Limpiar ROI» para dibujar "
-            "otro polígono."
+            "ROI finalizada e bloqueada. Use «Limpar ROI» para desenhar "
+            "outro polígono."
         )
         if self._step_index < len(self._steps):
             self._timer.start()
@@ -655,7 +680,7 @@ class ScanlineModule(QFrame):
         self.finish_button.setEnabled(False)
         self.clear_button.setEnabled(self._mode_active)
         self.status_label.setText(
-            "ROI limpia. Haz clic en la figura para marcar vértices."
+            "ROI limpa. Clique na figura para marcar os vértices."
         )
         self.roi_clear_requested.emit()
 
@@ -667,7 +692,7 @@ class DidacticPanel(QFrame):
     close_requested = Signal()
     roi_finish_requested = Signal()
     roi_clear_requested = Signal()
-    cohen_sutherland_mode_requested = Signal(bool)
+    clipping_mode_requested = Signal(bool)
     fill_step_changed = Signal(object)
 
     def __init__(self, parent=None):
@@ -705,6 +730,13 @@ class DidacticPanel(QFrame):
                 border: 1px solid #d5deea;
                 border-radius: 6px;
                 padding: 0 4px;
+            }
+            QComboBox {
+                min-height: 30px;
+                border: 1px solid #d5deea;
+                border-radius: 6px;
+                padding: 0 6px;
+                background: #ffffff;
             }
         """)
 
@@ -757,23 +789,22 @@ class DidacticPanel(QFrame):
             self._forward_fill_step
         )
         self.scanline_section = self._collapsible_section(
-            "Región de interés (ROI)",
+            "Região de interesse (ROI)",
             self.scanline_module,
         )
         content_layout.addWidget(self.scanline_section)
 
-        self.cohen_sutherland_module = CohenSutherlandModule()
-        self.cohen_sutherland_module.mode_requested.connect(
-            self._request_cohen_sutherland_mode
+        self.clipping_module = ArterialClippingModule()
+        self.clipping_module.mode_requested.connect(
+            self._request_clipping_mode
         )
-        self.cohen_sutherland_section = self._collapsible_section(
-            "Recorte Cohen–Sutherland",
-            self.cohen_sutherland_module,
+        self.clipping_section = self._collapsible_section(
+            "Recorte de artérias",
+            self.clipping_module,
         )
-        content_layout.addWidget(self.cohen_sutherland_section)
+        content_layout.addWidget(self.clipping_section)
 
         future_modules = (
-            "Recorte Liang–Barsky / Cyrus–Beck",
             "Recorte Sutherland–Hodgman",
         )
         for module_name in future_modules:
@@ -785,7 +816,7 @@ class DidacticPanel(QFrame):
         self.sections = {
             "bresenham": self.bresenham_section,
             "scanline": self.scanline_section,
-            "cohen_sutherland": self.cohen_sutherland_section,
+            "clipping": self.clipping_section,
         }
         content_layout.addStretch()
 
@@ -828,8 +859,8 @@ class DidacticPanel(QFrame):
     def _request_roi_clear(self):
         self.roi_clear_requested.emit()
 
-    def _request_cohen_sutherland_mode(self, active):
-        self.cohen_sutherland_mode_requested.emit(active)
+    def _request_clipping_mode(self, active):
+        self.clipping_mode_requested.emit(active)
 
     def _forward_fill_step(self, step):
         self.fill_step_changed.emit(step)

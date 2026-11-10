@@ -76,9 +76,13 @@ class VisualizationSurface(QWidget):
         self.didactic_panel.roi_clear_requested.connect(
             self._clear_scanline_roi
         )
-        self.didactic_panel.cohen_sutherland_mode_requested.connect(
-            self.set_cohen_sutherland_active
+        self.didactic_panel.clipping_mode_requested.connect(
+            self.set_clipping_active
         )
+        self.didactic_panel.clipping_module.algorithm_changed.connect(
+            self.set_clipping_algorithm
+        )
+        self._clipping_algorithm = self.didactic_panel.clipping_module.algorithm
 
         self.didactic_button = QPushButton("Modo didático", self)
         self.didactic_button.setFixedSize(144, 38)
@@ -113,13 +117,13 @@ class VisualizationSurface(QWidget):
         self.roi_shortcut.triggered.connect(self.toggle_roi_mode)
         self.roi_shortcut.setEnabled(False)
         self.addAction(self.roi_shortcut)
-        self.clipping_shortcut = QAction("Recortar com Cohen–Sutherland", self)
+        self.clipping_shortcut = QAction("Ativar recorte", self)
         self.clipping_shortcut.setShortcut("C")
         self.clipping_shortcut.setShortcutContext(
             Qt.ShortcutContext.WindowShortcut
         )
         self.clipping_shortcut.triggered.connect(
-            self.toggle_cohen_sutherland
+            self.toggle_clipping
         )
         self.clipping_shortcut.setEnabled(False)
         self.addAction(self.clipping_shortcut)
@@ -166,6 +170,7 @@ class VisualizationSurface(QWidget):
         self.viewer_container.addWidget(viewer_3d)
         self.viewer_container.setCurrentWidget(viewer_2d)
         self._viewer_2d = viewer_2d
+        viewer_2d.set_clipping_algorithm(self._clipping_algorithm)
         viewer_2d.artery_selected.connect(
             self.didactic_panel.bresenham_module.set_artery_selection
         )
@@ -179,7 +184,7 @@ class VisualizationSurface(QWidget):
             self.didactic_panel.scanline_module.start_fill
         )
         viewer_2d.clipping_updated.connect(
-            self.didactic_panel.cohen_sutherland_module.set_clipping_result
+            self.didactic_panel.clipping_module.set_clipping_result
         )
 
     def set_model_dimension(self, dimension):
@@ -300,18 +305,23 @@ class VisualizationSurface(QWidget):
         elif self._active_interaction == "scanline":
             self._set_dynamic_mode(None)
 
-    def toggle_cohen_sutherland(self):
+    def toggle_clipping(self):
         if not self._is_2d or self._viewer_2d is None:
             return
-        self.set_cohen_sutherland_active(
-            self._active_interaction != "cohen_sutherland"
+        self.set_clipping_active(
+            self._active_interaction != "clipping"
         )
 
-    def set_cohen_sutherland_active(self, active):
+    def set_clipping_algorithm(self, algorithm):
+        self._clipping_algorithm = algorithm
+        if self._viewer_2d is not None:
+            self._viewer_2d.set_clipping_algorithm(algorithm)
+
+    def set_clipping_active(self, active):
         active = bool(active)
         if active:
-            self._set_dynamic_mode("cohen_sutherland")
-        elif self._active_interaction == "cohen_sutherland":
+            self._set_dynamic_mode("clipping")
+        elif self._active_interaction == "clipping":
             self._set_dynamic_mode(None)
 
     def _set_dynamic_mode(self, mode):
@@ -330,9 +340,9 @@ class VisualizationSurface(QWidget):
         elif previous == "scanline":
             self._viewer_2d.set_scanline_roi_enabled(False)
             self.didactic_panel.scanline_module.set_mode_active(False)
-        elif previous == "cohen_sutherland":
-            self._viewer_2d.set_cohen_sutherland_enabled(False)
-            self.didactic_panel.cohen_sutherland_module.set_mode_active(False)
+        elif previous == "clipping":
+            self._viewer_2d.set_clipping_enabled(False)
+            self.didactic_panel.clipping_module.set_mode_active(False)
 
         self._active_interaction = mode
         if mode is None:
@@ -346,9 +356,9 @@ class VisualizationSurface(QWidget):
         elif mode == "scanline":
             self._viewer_2d.set_scanline_roi_enabled(True)
             self.didactic_panel.scanline_module.set_mode_active(True)
-        elif mode == "cohen_sutherland":
-            self._viewer_2d.set_cohen_sutherland_enabled(True)
-            self.didactic_panel.cohen_sutherland_module.set_mode_active(True)
+        elif mode == "clipping":
+            self._viewer_2d.set_clipping_enabled(True)
+            self.didactic_panel.clipping_module.set_mode_active(True)
 
     def _set_inspection_pixel(self, pixel):
         if self._viewer_2d is not None:
