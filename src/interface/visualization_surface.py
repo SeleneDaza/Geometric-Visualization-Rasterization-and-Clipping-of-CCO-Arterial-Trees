@@ -23,6 +23,8 @@ class VisualizationSurface(QWidget):
         self._panel_open = False
         self._active_interaction = None
         self._viewer_2d = None
+        self._viewer_title_text = "Visualizador 3D"
+        self._polygon_clipping_result = None
 
         self._content_splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self._content_splitter.setHandleWidth(6)
@@ -42,6 +44,8 @@ class VisualizationSurface(QWidget):
                 font-weight: 600;
             }
         """)
+        self.viewer_title.setWordWrap(True)
+        self.viewer_title.setMaximumWidth(420)
         self.viewer_title.hide()
 
         self.didactic_panel = DidacticPanel(self)
@@ -76,6 +80,26 @@ class VisualizationSurface(QWidget):
         self.didactic_panel.roi_clear_requested.connect(
             self._clear_scanline_roi
         )
+        self.didactic_panel.clipping_mode_requested.connect(
+            self.set_clipping_active
+        )
+        self.didactic_panel.clipping_module.algorithm_changed.connect(
+            self.set_clipping_algorithm
+        )
+        self.didactic_panel.clipping_module.exterior_highlight_requested.connect(
+            self.set_clipping_exterior_active
+        )
+        self.didactic_panel.polygon_clipping_mode_requested.connect(
+            self.set_sutherland_hodgman_active
+        )
+        self.didactic_panel.polygon_clipping_finish_requested.connect(
+            self._finalize_sutherland_hodgman_polygon
+        )
+        self.didactic_panel.polygon_clipping_clear_requested.connect(
+            self._clear_sutherland_hodgman_polygon
+        )
+        self._clipping_algorithm = self.didactic_panel.clipping_module.algorithm
+        self._clipping_exterior_enabled = False
 
         self.didactic_button = QPushButton("Modo didático", self)
         self.didactic_button.setFixedSize(144, 38)
@@ -110,6 +134,43 @@ class VisualizationSurface(QWidget):
         self.roi_shortcut.triggered.connect(self.toggle_roi_mode)
         self.roi_shortcut.setEnabled(False)
         self.addAction(self.roi_shortcut)
+        self.clipping_shortcut = QAction("Ativar recorte", self)
+        self.clipping_shortcut.setShortcut("C")
+        self.clipping_shortcut.setShortcutContext(
+            Qt.ShortcutContext.WindowShortcut
+        )
+        self.clipping_shortcut.triggered.connect(
+            self.toggle_clipping
+        )
+        self.clipping_shortcut.setEnabled(False)
+        self.addAction(self.clipping_shortcut)
+        self.clipping_exterior_shortcut = QAction(
+            "Alternar destaque dos segmentos externos",
+            self,
+        )
+        self.clipping_exterior_shortcut.setShortcut("E")
+        self.clipping_exterior_shortcut.setShortcutContext(
+            Qt.ShortcutContext.WindowShortcut
+        )
+        self.clipping_exterior_shortcut.setCheckable(True)
+        self.clipping_exterior_shortcut.toggled.connect(
+            self.set_clipping_exterior_active
+        )
+        self.clipping_exterior_shortcut.setEnabled(False)
+        self.addAction(self.clipping_exterior_shortcut)
+        self.polygon_clipping_shortcut = QAction(
+            "Recorte de polígonos (Sutherland–Hodgman)",
+            self,
+        )
+        self.polygon_clipping_shortcut.setShortcut("H")
+        self.polygon_clipping_shortcut.setShortcutContext(
+            Qt.ShortcutContext.WindowShortcut
+        )
+        self.polygon_clipping_shortcut.triggered.connect(
+            self.toggle_sutherland_hodgman
+        )
+        self.polygon_clipping_shortcut.setEnabled(False)
+        self.addAction(self.polygon_clipping_shortcut)
 
         self.transform_button = QPushButton("Transformar cena", self)
         self.transform_button.setFixedSize(168, 38)
@@ -153,6 +214,10 @@ class VisualizationSurface(QWidget):
         self.viewer_container.addWidget(viewer_3d)
         self.viewer_container.setCurrentWidget(viewer_2d)
         self._viewer_2d = viewer_2d
+        viewer_2d.set_clipping_algorithm(self._clipping_algorithm)
+        viewer_2d.set_clipping_exterior_enabled(
+            self._clipping_exterior_enabled
+        )
         viewer_2d.artery_selected.connect(
             self.didactic_panel.bresenham_module.set_artery_selection
         )
@@ -165,6 +230,12 @@ class VisualizationSurface(QWidget):
         viewer_2d.roi_finalized.connect(
             self.didactic_panel.scanline_module.start_fill
         )
+        viewer_2d.clipping_updated.connect(
+            self.didactic_panel.clipping_module.set_clipping_result
+        )
+        viewer_2d.polygon_clipping_updated.connect(
+            self._set_sutherland_hodgman_result
+        )
 
     def set_model_dimension(self, dimension):
         if self._active_interaction is not None:
@@ -172,13 +243,17 @@ class VisualizationSurface(QWidget):
         self._is_2d = dimension == 2
         self.inspector_shortcut.setEnabled(self._is_2d)
         self.roi_shortcut.setEnabled(self._is_2d)
+        self.clipping_shortcut.setEnabled(self._is_2d)
+        self.clipping_exterior_shortcut.setEnabled(self._is_2d)
+        self.polygon_clipping_shortcut.setEnabled(self._is_2d)
         if self._panel_open:
             self.didactic_panel.hide()
             self.transform_panel.hide()
             self._panel_open = False
-        self.viewer_title.setText(
+        self._viewer_title_text = (
             "Visualizador 2D" if self._is_2d else "Visualizador 3D"
         )
+        self._update_viewer_title()
         self.viewer_title.show()
         self.didactic_button.setVisible(self._is_2d)
         self.transform_button.setVisible(not self._is_2d)
@@ -283,6 +358,55 @@ class VisualizationSurface(QWidget):
         elif self._active_interaction == "scanline":
             self._set_dynamic_mode(None)
 
+    def toggle_clipping(self):
+        if not self._is_2d or self._viewer_2d is None:
+            return
+        self.set_clipping_active(
+            self._active_interaction != "clipping"
+        )
+
+    def set_clipping_algorithm(self, algorithm):
+        self._clipping_algorithm = algorithm
+        if self._viewer_2d is not None:
+            self._viewer_2d.set_clipping_algorithm(algorithm)
+
+    def set_clipping_exterior_active(self, active):
+        active = bool(active)
+        if active == self._clipping_exterior_enabled:
+            return
+        self._clipping_exterior_enabled = active
+        self.didactic_panel.clipping_module.set_exterior_highlight_active(
+            self._clipping_exterior_enabled
+        )
+        self.clipping_exterior_shortcut.setChecked(
+            self._clipping_exterior_enabled
+        )
+        if self._viewer_2d is not None:
+            self._viewer_2d.set_clipping_exterior_enabled(
+                self._clipping_exterior_enabled
+            )
+
+    def set_clipping_active(self, active):
+        active = bool(active)
+        if active:
+            self._set_dynamic_mode("clipping")
+        elif self._active_interaction == "clipping":
+            self._set_dynamic_mode(None)
+
+    def toggle_sutherland_hodgman(self):
+        if not self._is_2d or self._viewer_2d is None:
+            return
+        self.set_sutherland_hodgman_active(
+            self._active_interaction != "sutherland_hodgman"
+        )
+
+    def set_sutherland_hodgman_active(self, active):
+        active = bool(active)
+        if active:
+            self._set_dynamic_mode("sutherland_hodgman")
+        elif self._active_interaction == "sutherland_hodgman":
+            self._set_dynamic_mode(None)
+
     def _set_dynamic_mode(self, mode):
         if mode == self._active_interaction:
             return
@@ -299,9 +423,18 @@ class VisualizationSurface(QWidget):
         elif previous == "scanline":
             self._viewer_2d.set_scanline_roi_enabled(False)
             self.didactic_panel.scanline_module.set_mode_active(False)
+        elif previous == "clipping":
+            self._viewer_2d.set_clipping_enabled(False)
+            self.didactic_panel.clipping_module.set_mode_active(False)
+        elif previous == "sutherland_hodgman":
+            self._viewer_2d.set_sutherland_hodgman_enabled(False)
+            self.didactic_panel.sutherland_hodgman_module.set_mode_active(
+                False
+            )
 
         self._active_interaction = mode
         if mode is None:
+            self._update_viewer_title()
             return
 
         self.open_didactic_panel()
@@ -312,6 +445,46 @@ class VisualizationSurface(QWidget):
         elif mode == "scanline":
             self._viewer_2d.set_scanline_roi_enabled(True)
             self.didactic_panel.scanline_module.set_mode_active(True)
+        elif mode == "clipping":
+            self._viewer_2d.set_clipping_enabled(True)
+            self.didactic_panel.clipping_module.set_mode_active(True)
+        elif mode == "sutherland_hodgman":
+            self._viewer_2d.set_sutherland_hodgman_enabled(True)
+            self.didactic_panel.sutherland_hodgman_module.set_mode_active(
+                True
+            )
+        self._update_viewer_title()
+
+    def _set_sutherland_hodgman_result(self, result):
+        self._polygon_clipping_result = result
+        self.didactic_panel.sutherland_hodgman_module.set_clipping_result(
+            result
+        )
+        self._update_viewer_title()
+
+    def _finalize_sutherland_hodgman_polygon(self):
+        if self._active_interaction == "sutherland_hodgman":
+            self._viewer_2d.finalize_sutherland_hodgman_polygon()
+
+    def _clear_sutherland_hodgman_polygon(self):
+        if self._active_interaction == "sutherland_hodgman":
+            self._viewer_2d.clear_sutherland_hodgman_polygon()
+
+    def _update_viewer_title(self):
+        if self._active_interaction == "sutherland_hodgman":
+            result = self._polygon_clipping_result or {}
+            input_count = result.get("input_vertices", 0)
+            output_count = result.get("clipped_vertices", 0)
+            self.viewer_title.setText(
+                "[H] Recorte de polígono ROI (Sutherland–Hodgman): ATIVO\n"
+                f"Vértices CCO selecionados: {input_count} -> "
+                f"Vértices após o corte: {output_count}\n"
+                "Limitação teórica: para polígonos côncavos com arestas "
+                "artificiais, é necessário usar Weiler–Atherton."
+            )
+        else:
+            self.viewer_title.setText(self._viewer_title_text)
+        self.viewer_title.adjustSize()
 
     def _set_inspection_pixel(self, pixel):
         if self._viewer_2d is not None:
