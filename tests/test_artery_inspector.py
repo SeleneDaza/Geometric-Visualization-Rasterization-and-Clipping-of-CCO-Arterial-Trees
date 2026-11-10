@@ -4,6 +4,7 @@ import numpy as np
 import pyvista as pv
 
 from src.visualization.artery_inspector import (
+    closest_cell_vertex,
     closest_cell_segment,
     original_cell_id,
     raster_grid_endpoints,
@@ -48,6 +49,17 @@ class ArteryInspectorTests(unittest.TestCase):
 
         self.assertEqual(segment, ((1.0, 0.0, 0.0), (2.0, 1.0, 0.0)))
         self.assertIsNone(closest_cell_segment(self.model, 9, (0, 0, 0)))
+
+    def test_selects_an_actual_vertex_from_the_picked_artery(self):
+        vertex_id, vertex = closest_cell_vertex(
+            self.model,
+            1,
+            (1.9, 0.8, 0.0),
+        )
+
+        self.assertEqual(vertex_id, 2)
+        self.assertEqual(vertex, (2.0, 1.0, 0.0))
+        self.assertIsNone(closest_cell_vertex(self.model, 9, (0, 0, 0)))
 
     def test_maps_segment_to_a_zoomed_integer_pixel_grid(self):
         class Renderer:

@@ -48,6 +48,14 @@ em 2D ou 3D.
   «Destacar exteriores (E)» para alternar, independentemente do modo de
   desenho, o destaque laranja dos trechos externos à janela. A tecla `C`
   continua controlando apenas o desenho do recorte.
+- **RF14 — Recorte Sutherland–Hodgman:** pressione `H` para delimitar uma ROI
+  poligonal com vértices reais selecionados nas artérias do modelo CCO e
+  recortá-la pela janela retangular definida no modo `C`. Selecione os pontos
+  na ordem do contorno, finalize o polígono no painel e arraste com o botão
+  direito para atualizar a janela sem sair do modo. A rede completa permanece
+  visível; o contorno recortado e os trechos arteriais dentro dele são
+  destacados. O HUD informa as quantidades de vértices e a limitação para
+  polígonos côncavos.
 
 ## Execução
 
@@ -74,6 +82,12 @@ Para o Scanline, pressione `R`, marque pelo menos três vértices no modelo e
 selecione «Finalizar polígono». O contorno muda de cor e fica bloqueado; use
 «Limpar ROI» para recomeçar. Os módulos didáticos são expansíveis e começam
 recolhidos; ativar `I` ou `R` expande o módulo correspondente e troca o modo.
+Para o recorte de polígonos, defina primeiro a janela com `C` e pressione `H`.
+Clique sobre as artérias para selecionar ao menos três vértices reais do CCO,
+na ordem do contorno da ROI, e selecione «Finalizar polígono». A janela pode
+ser ajustada em tempo real com o botão direito; use «Limpar ROI» para
+selecionar outro polígono. A rede completa permanece no fundo e os trechos
+contidos na ROI recortada são realçados. A tecla `H` desativa o modo.
 
 ## Testes
 

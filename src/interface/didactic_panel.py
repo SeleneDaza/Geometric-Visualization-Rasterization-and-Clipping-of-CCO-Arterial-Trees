@@ -496,6 +496,101 @@ class ArterialClippingModule(QFrame):
         )
 
 
+class SutherlandHodgmanModule(QFrame):
+    mode_requested = Signal(bool)
+    finalize_requested = Signal()
+    clear_requested = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._mode_active = False
+        self._input_vertices = 0
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+
+        heading_row = QHBoxLayout()
+        heading = QLabel("Recorte de polígonos (Sutherland–Hodgman)")
+        heading.setObjectName("moduleHeading")
+        heading.setWordWrap(True)
+        heading_row.addWidget(heading)
+        self.mode_button = QPushButton("Ativar modo (H)")
+        self.mode_button.setToolTip(
+            "Ativa o recorte de um polígono ROI pela janela retangular (H)"
+        )
+        self.mode_button.clicked.connect(
+            lambda: self.mode_requested.emit(not self._mode_active)
+        )
+        heading_row.addWidget(self.mode_button)
+        layout.addLayout(heading_row)
+
+        description = QLabel(
+            "Defina a janela no modo C. Em seguida, clique sobre as artérias "
+            "CCO para selecionar vértices reais, na ordem do contorno da ROI, "
+            "e finalize o polígono. Arraste com o botão direito para ajustar "
+            "a janela sem sair do modo H."
+        )
+        description.setWordWrap(True)
+        layout.addWidget(description)
+
+        controls = QHBoxLayout()
+        self.finish_button = QPushButton("Finalizar polígono")
+        self.finish_button.setEnabled(False)
+        self.finish_button.clicked.connect(self.finalize_requested)
+        controls.addWidget(self.finish_button)
+        self.clear_button = QPushButton("Limpar ROI")
+        self.clear_button.setEnabled(False)
+        self.clear_button.clicked.connect(self.clear_requested)
+        controls.addWidget(self.clear_button)
+        layout.addLayout(controls)
+
+        self.status_label = QLabel("Modo H desativado.")
+        self.status_label.setObjectName("mutedText")
+        self.status_label.setWordWrap(True)
+        layout.addWidget(self.status_label)
+
+    def set_mode_active(self, active):
+        self._mode_active = bool(active)
+        self._input_vertices = 0
+        self.mode_button.setText(
+            "Desativar modo (H)"
+            if self._mode_active else "Ativar modo (H)"
+        )
+        self.finish_button.setEnabled(False)
+        self.clear_button.setEnabled(self._mode_active)
+        self.status_label.setText(
+            "Clique sobre artérias CCO para selecionar pelo menos três "
+            "vértices reais, na ordem do contorno da ROI."
+            if self._mode_active else "Modo H desativado."
+        )
+
+    def set_clipping_result(self, result):
+        if result is None:
+            self._input_vertices = 0
+            self.finish_button.setEnabled(False)
+            return
+
+        self._input_vertices = result["input_vertices"]
+        finalized = result["finalized"]
+        self.finish_button.setEnabled(
+            self._mode_active and self._input_vertices >= 3 and not finalized
+        )
+        self.clear_button.setEnabled(self._mode_active)
+        if result["error"]:
+            self.status_label.setText(result["error"])
+        elif not finalized:
+            self.status_label.setText(
+                f"Vértices CCO selecionados: {self._input_vertices}. "
+                "Finalize o polígono para recortar."
+            )
+        else:
+            self.status_label.setText(
+                f"Vértices CCO selecionados: {self._input_vertices} · "
+                f"vértices após o corte: {result['clipped_vertices']} · "
+                f"trechos arteriais visíveis: {result['arterial_segments']}."
+            )
+
+
 class ScanlineModule(QFrame):
     mode_requested = Signal(bool)
     roi_finish_requested = Signal()
@@ -534,7 +629,8 @@ class ScanlineModule(QFrame):
 
         description = QLabel(
             "Ative o modo e clique na figura para marcar os vértices. "
-            "Finalize o polígono para ver o preenchimento scanline passo a passo."
+            "Finalize o polígono para acompanhar a varredura Scanline passo "
+            "a passo."
         )
         description.setWordWrap(True)
         layout.addWidget(description)
@@ -550,7 +646,7 @@ class ScanlineModule(QFrame):
         controls.addWidget(self.clear_button)
         layout.addLayout(controls)
 
-        self.status_label = QLabel("Modo de delimitación desactivado.")
+        self.status_label = QLabel("Modo de delimitação desativado.")
         self.status_label.setObjectName("mutedText")
         self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
@@ -601,7 +697,7 @@ class ScanlineModule(QFrame):
         self.clear_button.setEnabled(active)
         self.status_label.setText(
             "Clique em pelo menos três pontos da figura e finalize o polígono."
-            if active else "Modo de delimitación desactivado."
+            if active else "Modo de delimitação desativado."
         )
 
     def add_roi_vertex(self, vertex):
@@ -611,7 +707,7 @@ class ScanlineModule(QFrame):
         self.finish_button.setEnabled(len(self._vertices) >= 3)
         self.status_label.setText(
             f"Vértices marcados: {len(self._vertices)}. "
-            "Añade más o finaliza el polígono."
+            "Adicione mais vértices ou finalize o polígono."
         )
 
     def set_roi_vertices(self, vertices):
@@ -725,6 +821,9 @@ class DidacticPanel(QFrame):
     roi_finish_requested = Signal()
     roi_clear_requested = Signal()
     clipping_mode_requested = Signal(bool)
+    polygon_clipping_mode_requested = Signal(bool)
+    polygon_clipping_finish_requested = Signal()
+    polygon_clipping_clear_requested = Signal()
     fill_step_changed = Signal(object)
 
     def __init__(self, parent=None):
@@ -836,41 +935,31 @@ class DidacticPanel(QFrame):
         )
         content_layout.addWidget(self.clipping_section)
 
-        future_modules = (
-            "Recorte Sutherland–Hodgman",
+        self.sutherland_hodgman_module = SutherlandHodgmanModule()
+        self.sutherland_hodgman_module.mode_requested.connect(
+            self._request_polygon_clipping_mode
         )
-        for module_name in future_modules:
-            section = self._collapsible_section(
-                module_name,
-                self._future_module(module_name),
-            )
-            content_layout.addWidget(section)
+        self.sutherland_hodgman_module.finalize_requested.connect(
+            self.polygon_clipping_finish_requested
+        )
+        self.sutherland_hodgman_module.clear_requested.connect(
+            self.polygon_clipping_clear_requested
+        )
+        self.sutherland_hodgman_section = self._collapsible_section(
+            "Recorte Sutherland–Hodgman",
+            self.sutherland_hodgman_module,
+        )
+        content_layout.addWidget(self.sutherland_hodgman_section)
         self.sections = {
             "bresenham": self.bresenham_section,
             "scanline": self.scanline_section,
             "clipping": self.clipping_section,
+            "sutherland_hodgman": self.sutherland_hodgman_section,
         }
         content_layout.addStretch()
 
         self.scroll_area.setWidget(content)
         root_layout.addWidget(self.scroll_area, stretch=1)
-
-    @staticmethod
-    def _future_module(name):
-        card = QFrame()
-        card.setObjectName("moduleCard")
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(4)
-        title = QLabel(name)
-        title.setObjectName("moduleHeading")
-        title.setWordWrap(True)
-        layout.addWidget(title)
-        status = QLabel("Ainda não implementado")
-        status.setObjectName("mutedText")
-        status.setWordWrap(True)
-        layout.addWidget(status)
-        return card
 
     @staticmethod
     def _collapsible_section(title, content):
@@ -893,6 +982,9 @@ class DidacticPanel(QFrame):
 
     def _request_clipping_mode(self, active):
         self.clipping_mode_requested.emit(active)
+
+    def _request_polygon_clipping_mode(self, active):
+        self.polygon_clipping_mode_requested.emit(active)
 
     def _forward_fill_step(self, step):
         self.fill_step_changed.emit(step)

@@ -52,6 +52,22 @@ def closest_cell_segment(model, cell_id: int, pick_position):
     return best_segment
 
 
+def closest_cell_vertex(model, cell_id: int, pick_position):
+    if cell_id < 0 or cell_id >= model.n_cells:
+        return None
+
+    point_ids = np.asarray(model.get_cell(cell_id).point_ids, dtype=int)
+    if point_ids.size == 0:
+        return None
+
+    points = np.asarray(model.points, dtype=float)[point_ids]
+    pick = np.asarray(pick_position, dtype=float)
+    distances = np.sum((points - pick) ** 2, axis=1)
+    index = int(np.argmin(distances))
+    point_id = int(point_ids[index])
+    return point_id, tuple(points[index])
+
+
 def raster_grid_endpoints(renderer, start, end, max_grid_span: int = 40):
     if max_grid_span < 1:
         raise ValueError("A escala da grade deve ser positiva.")
