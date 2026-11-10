@@ -1,9 +1,10 @@
 import numpy as np
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 import pyvista as pv
 from pyvistaqt import QtInteractor
 from vtkmodules.vtkRenderingCore import vtkCellPicker
 
+from clipping.cohen_sutherland import clip_polydata
 from visualization.artery_inspector import (
     closest_cell_segment,
     original_cell_id,
@@ -15,10 +16,18 @@ from visualization.arterial_renderer import (
 )
 
 
+def _qt_to_vtk_display_position(position, height, device_pixel_ratio):
+    return (
+        round(position.x() * device_pixel_ratio),
+        round((height - position.y() - 1) * device_pixel_ratio),
+    )
+
+
 class Viewer2D(QtInteractor):
     artery_selected = Signal(object)
     roi_vertex_added = Signal(object)
     roi_finalized = Signal(object)
+    clipping_updated = Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -38,6 +47,14 @@ class Viewer2D(QtInteractor):
         self._roi_fill_actors = []
         self._roi_display_depth = 0.0
         self._roi_cell_size = 8.0
+        self._color_map = "viridis"
+        self._model_actors = []
+        self._cohen_sutherland_enabled = False
+        self._clip_dragging = False
+        self._clip_start = None
+        self._clip_display_depth = 0.0
+        self._clip_window_actor = None
+        self._clipped_actors = []
         self._cell_picker = vtkCellPicker()
         self._cell_picker.SetTolerance(0.01)
 
@@ -51,8 +68,16 @@ class Viewer2D(QtInteractor):
             self._scanline_observer = None
         self._inspection_enabled = False
         self._scanline_enabled = False
+        self._cohen_sutherland_enabled = False
+        self._clip_dragging = False
         self._model = model
+        self._color_map = color_map
         self.clear()
+        self._model_actors.clear()
+        self._clipped_actors.clear()
+        self._clip_window_actor = None
+        self._clip_start = None
+        self.setCursor(Qt.CursorShape.ArrowCursor)
         self._selected_artery_actor = None
         self._inspection_marker_actor = None
         self._inspection_selection = None
@@ -61,11 +86,12 @@ class Viewer2D(QtInteractor):
         self._roi_vertices.clear()
         self._roi_finalized = False
         self._apply_anti_aliasing()
-        add_arterial_mesh(self, model, color_map)
+        self._model_actors = add_arterial_mesh(self, model, color_map)
         self.view_xy()
         self.reset_camera()
         self.render()
         self.artery_selected.emit(None)
+        self.clipping_updated.emit(None)
 
     def set_antialiasing(self, enabled):
         self._anti_aliasing_enabled = bool(enabled)
@@ -75,6 +101,142 @@ class Viewer2D(QtInteractor):
 
     def _apply_anti_aliasing(self):
         set_anti_aliasing(self, self._anti_aliasing_enabled)
+
+    def set_cohen_sutherland_enabled(self, enabled):
+        enabled = bool(enabled)
+        if enabled == self._cohen_sutherland_enabled:
+            return
+        if enabled and self._model is None:
+            raise RuntimeError("Nenhum modelo 2D foi carregado.")
+
+        self._cohen_sutherland_enabled = enabled
+        self._clip_dragging = False
+        self._clip_start = None
+        if enabled:
+            self.renderer.SetWorldPoint(*self._model.center, 1.0)
+            self.renderer.WorldToDisplay()
+            self._clip_display_depth = self.renderer.GetDisplayPoint()[2]
+        self.setMouseTracking(enabled)
+        self.setCursor(
+            Qt.CursorShape.CrossCursor if enabled else Qt.CursorShape.ArrowCursor
+        )
+        self._clear_cohen_sutherland_actors()
+        for actor in self._model_actors:
+            actor.SetVisibility(True)
+        self.render()
+        if not enabled:
+            self.clipping_updated.emit(None)
+
+    def mousePressEvent(self, event):
+        if (
+            self._cohen_sutherland_enabled
+            and event.button() == Qt.MouseButton.LeftButton
+        ):
+            self._clip_dragging = True
+            self._clip_start = self._world_at_clip_position(event.pos())
+            self._update_clipping_window(event.pos())
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._cohen_sutherland_enabled:
+            if self._clip_dragging:
+                self._update_clipping_window(event.pos())
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if (
+            self._cohen_sutherland_enabled
+            and event.button() == Qt.MouseButton.LeftButton
+            and self._clip_dragging
+        ):
+            self._update_clipping_window(event.pos())
+            self._clip_dragging = False
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def _world_at_clip_position(self, position):
+        display_x, display_y = _qt_to_vtk_display_position(
+            position,
+            self.height(),
+            self.devicePixelRatioF(),
+        )
+        self.renderer.SetDisplayPoint(
+            display_x,
+            display_y,
+            self._clip_display_depth,
+        )
+        self.renderer.DisplayToWorld()
+        world = np.asarray(self.renderer.GetWorldPoint(), dtype=float)
+        if world[3] == 0:
+            raise RuntimeError(
+                "Não foi possível converter a posição da janela de recorte."
+            )
+        return world[:3] / world[3]
+
+    def _update_clipping_window(self, position):
+        start = self._clip_start
+        end = self._world_at_clip_position(position)
+        xmin, xmax = sorted((float(start[0]), float(end[0])))
+        ymin, ymax = sorted((float(start[1]), float(end[1])))
+        if xmin == xmax or ymin == ymax:
+            self._clear_cohen_sutherland_actors()
+            for actor in self._model_actors:
+                actor.SetVisibility(True)
+            self.render()
+            self.clipping_updated.emit(None)
+            return
+
+        window = (xmin, ymin, xmax, ymax)
+        clipped_model = clip_polydata(self._model, window)
+        for actor in self._model_actors:
+            actor.SetVisibility(False)
+        self._clear_cohen_sutherland_actors()
+        if clipped_model.n_cells:
+            self._clipped_actors = add_arterial_mesh(
+                self,
+                clipped_model,
+                self._color_map,
+                show_scalar_bar=False,
+            )
+
+        z = float(self._model.center[2])
+        rectangle = pv.PolyData(
+            np.asarray(
+                [
+                    (xmin, ymin, z),
+                    (xmax, ymin, z),
+                    (xmax, ymax, z),
+                    (xmin, ymax, z),
+                ],
+                dtype=float,
+            )
+        )
+        rectangle.lines = np.asarray([5, 0, 1, 2, 3, 0], dtype=np.int64)
+        self._clip_window_actor = self.add_mesh(
+            rectangle,
+            color="#f4b400",
+            line_width=2,
+            render_lines_as_tubes=True,
+            name="cohen_sutherland_window",
+        )
+        self.clipping_updated.emit({
+            "window": window,
+            "segments": clipped_model.n_cells,
+        })
+        self.render()
+
+    def _clear_cohen_sutherland_actors(self):
+        for actor in self._clipped_actors:
+            self.remove_actor(actor)
+        self._clipped_actors.clear()
+        if self._clip_window_actor is not None:
+            self.remove_actor(self._clip_window_actor)
+            self._clip_window_actor = None
 
     def wheelEvent(self, event):
         horizontal_delta = event.pixelDelta().x()

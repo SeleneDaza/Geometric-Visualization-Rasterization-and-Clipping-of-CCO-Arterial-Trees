@@ -381,6 +381,63 @@ class BresenhamModule(QFrame):
             self.inspection_pixel_changed.emit(pixel)
 
 
+class CohenSutherlandModule(QFrame):
+    mode_requested = Signal(bool)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._mode_active = False
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+
+        heading_row = QHBoxLayout()
+        heading = QLabel("Recorte Cohen–Sutherland")
+        heading.setObjectName("moduleHeading")
+        heading_row.addWidget(heading)
+        heading_row.addStretch()
+        self.mode_button = QPushButton("Desenhar janela (C)")
+        self.mode_button.setToolTip(
+            "Ativa o desenho de uma janela retangular no visualizador 2D (C)"
+        )
+        self.mode_button.clicked.connect(
+            lambda: self.mode_requested.emit(not self._mode_active)
+        )
+        heading_row.addWidget(self.mode_button)
+        layout.addLayout(heading_row)
+
+        description = QLabel(
+            "Ative o modo e arraste sobre a rede para desenhar a janela. "
+            "Os segmentos são recortados em tempo real enquanto você arrasta."
+        )
+        description.setWordWrap(True)
+        layout.addWidget(description)
+
+        self.status_label = QLabel("Modo de recorte desativado.")
+        self.status_label.setObjectName("mutedText")
+        self.status_label.setWordWrap(True)
+        layout.addWidget(self.status_label)
+
+    def set_mode_active(self, active):
+        self._mode_active = bool(active)
+        self.mode_button.setText(
+            "Cancelar recorte" if self._mode_active else "Desenhar janela (C)"
+        )
+        self.status_label.setText(
+            "Arraste na visualização para definir a janela retangular."
+            if self._mode_active else "Modo de recorte desativado."
+        )
+
+    def set_clipping_result(self, result):
+        if not self._mode_active or result is None:
+            return
+        xmin, ymin, xmax, ymax = result["window"]
+        self.status_label.setText(
+            f"Janela: x [{xmin:.4g}, {xmax:.4g}], "
+            f"y [{ymin:.4g}, {ymax:.4g}] · "
+            f"{result['segments']} segmentos visíveis."
+        )
+
+
 class ScanlineModule(QFrame):
     mode_requested = Signal(bool)
     roi_finish_requested = Signal()
@@ -608,7 +665,10 @@ class ScanlineModule(QFrame):
 
 class DidacticPanel(QFrame):
     close_requested = Signal()
+    roi_finish_requested = Signal()
     roi_clear_requested = Signal()
+    cohen_sutherland_mode_requested = Signal(bool)
+    fill_step_changed = Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -702,8 +762,17 @@ class DidacticPanel(QFrame):
         )
         content_layout.addWidget(self.scanline_section)
 
-        future_modules = (
+        self.cohen_sutherland_module = CohenSutherlandModule()
+        self.cohen_sutherland_module.mode_requested.connect(
+            self._request_cohen_sutherland_mode
+        )
+        self.cohen_sutherland_section = self._collapsible_section(
             "Recorte Cohen–Sutherland",
+            self.cohen_sutherland_module,
+        )
+        content_layout.addWidget(self.cohen_sutherland_section)
+
+        future_modules = (
             "Recorte Liang–Barsky / Cyrus–Beck",
             "Recorte Sutherland–Hodgman",
         )
@@ -716,6 +785,7 @@ class DidacticPanel(QFrame):
         self.sections = {
             "bresenham": self.bresenham_section,
             "scanline": self.scanline_section,
+            "cohen_sutherland": self.cohen_sutherland_section,
         }
         content_layout.addStretch()
 
@@ -755,14 +825,11 @@ class DidacticPanel(QFrame):
     def _request_roi_finish(self):
         self.roi_finish_requested.emit()
 
-    roi_finish_requested = Signal()
-
     def _request_roi_clear(self):
         self.roi_clear_requested.emit()
 
-    roi_clear_requested = Signal()
+    def _request_cohen_sutherland_mode(self, active):
+        self.cohen_sutherland_mode_requested.emit(active)
 
     def _forward_fill_step(self, step):
         self.fill_step_changed.emit(step)
-
-    fill_step_changed = Signal(object)

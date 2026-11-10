@@ -76,6 +76,9 @@ class VisualizationSurface(QWidget):
         self.didactic_panel.roi_clear_requested.connect(
             self._clear_scanline_roi
         )
+        self.didactic_panel.cohen_sutherland_mode_requested.connect(
+            self.set_cohen_sutherland_active
+        )
 
         self.didactic_button = QPushButton("Modo didático", self)
         self.didactic_button.setFixedSize(144, 38)
@@ -110,6 +113,16 @@ class VisualizationSurface(QWidget):
         self.roi_shortcut.triggered.connect(self.toggle_roi_mode)
         self.roi_shortcut.setEnabled(False)
         self.addAction(self.roi_shortcut)
+        self.clipping_shortcut = QAction("Recortar com Cohen–Sutherland", self)
+        self.clipping_shortcut.setShortcut("C")
+        self.clipping_shortcut.setShortcutContext(
+            Qt.ShortcutContext.WindowShortcut
+        )
+        self.clipping_shortcut.triggered.connect(
+            self.toggle_cohen_sutherland
+        )
+        self.clipping_shortcut.setEnabled(False)
+        self.addAction(self.clipping_shortcut)
 
         self.transform_button = QPushButton("Transformar cena", self)
         self.transform_button.setFixedSize(168, 38)
@@ -165,6 +178,9 @@ class VisualizationSurface(QWidget):
         viewer_2d.roi_finalized.connect(
             self.didactic_panel.scanline_module.start_fill
         )
+        viewer_2d.clipping_updated.connect(
+            self.didactic_panel.cohen_sutherland_module.set_clipping_result
+        )
 
     def set_model_dimension(self, dimension):
         if self._active_interaction is not None:
@@ -172,6 +188,7 @@ class VisualizationSurface(QWidget):
         self._is_2d = dimension == 2
         self.inspector_shortcut.setEnabled(self._is_2d)
         self.roi_shortcut.setEnabled(self._is_2d)
+        self.clipping_shortcut.setEnabled(self._is_2d)
         if self._panel_open:
             self.didactic_panel.hide()
             self.transform_panel.hide()
@@ -283,6 +300,20 @@ class VisualizationSurface(QWidget):
         elif self._active_interaction == "scanline":
             self._set_dynamic_mode(None)
 
+    def toggle_cohen_sutherland(self):
+        if not self._is_2d or self._viewer_2d is None:
+            return
+        self.set_cohen_sutherland_active(
+            self._active_interaction != "cohen_sutherland"
+        )
+
+    def set_cohen_sutherland_active(self, active):
+        active = bool(active)
+        if active:
+            self._set_dynamic_mode("cohen_sutherland")
+        elif self._active_interaction == "cohen_sutherland":
+            self._set_dynamic_mode(None)
+
     def _set_dynamic_mode(self, mode):
         if mode == self._active_interaction:
             return
@@ -299,6 +330,9 @@ class VisualizationSurface(QWidget):
         elif previous == "scanline":
             self._viewer_2d.set_scanline_roi_enabled(False)
             self.didactic_panel.scanline_module.set_mode_active(False)
+        elif previous == "cohen_sutherland":
+            self._viewer_2d.set_cohen_sutherland_enabled(False)
+            self.didactic_panel.cohen_sutherland_module.set_mode_active(False)
 
         self._active_interaction = mode
         if mode is None:
@@ -312,6 +346,9 @@ class VisualizationSurface(QWidget):
         elif mode == "scanline":
             self._viewer_2d.set_scanline_roi_enabled(True)
             self.didactic_panel.scanline_module.set_mode_active(True)
+        elif mode == "cohen_sutherland":
+            self._viewer_2d.set_cohen_sutherland_enabled(True)
+            self.didactic_panel.cohen_sutherland_module.set_mode_active(True)
 
     def _set_inspection_pixel(self, pixel):
         if self._viewer_2d is not None:

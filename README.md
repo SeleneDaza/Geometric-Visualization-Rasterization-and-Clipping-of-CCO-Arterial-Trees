@@ -36,6 +36,10 @@ em 2D ou 3D.
 - **RF10 — Alternância de antialiasing:** a opção «Ativar antialiasing (FXAA)»
   na barra lateral liga ou desliga a filtragem de subpixel nos visualizadores
   2D e 3D, permitindo comparar as bordas das artérias com e sem suavização.
+- **RF11 — Recorte Cohen–Sutherland:** no modo didático 2D, a tecla `C` ou o
+  botão «Desenhar janela (C)» ativa o recorte. Arraste sobre a rede para
+  sobrepor uma janela retangular; os segmentos visíveis dentro dela são
+  recalculados em tempo real pelo algoritmo Cohen–Sutherland.
 
 ## Execução
 
@@ -52,6 +56,8 @@ artéria e selecione uma linha da tabela para destacar seu pixel. Pressione `I`
 novamente ou «Fechar painel» para sair do modo.
 Use «Ativar antialiasing (FXAA)» na barra lateral para alternar a suavização
 das artérias em qualquer visualizador.
+No modo 2D, pressione `C` ou abra «Modo didático» e selecione «Desenhar
+janela (C)»; arraste sobre o modelo para recortar os segmentos em tempo real.
 Para o Scanline, pressione `R`, marque pelo menos três vértices no modelo e
 selecione «Finalizar polígono». O contorno muda de cor e fica bloqueado; use
 «Limpar ROI» para recomeçar. Os módulos didáticos são expansíveis e começam

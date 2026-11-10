@@ -17,13 +17,21 @@ def set_anti_aliasing(plotter, enabled):
         plotter.disable_anti_aliasing()
 
 
-def add_arterial_mesh(plotter, model, color_map="viridis"):
+def add_arterial_mesh(
+    plotter,
+    model,
+    color_map="viridis",
+    show_scalar_bar=True,
+):
     if color_map not in COLOR_MAPS:
         raise ValueError(f"Mapa de cores não suportado: {color_map}")
 
+    actors = []
     if "raio" not in model.cell_data:
-        plotter.add_mesh(model, color="#1769aa", line_width=3)
-        return
+        actors.append(
+            plotter.add_mesh(model, color="#1769aa", line_width=3)
+        )
+        return actors
 
     radii = np.asarray(model.cell_data["raio"], dtype=float)
     if radii.size != model.n_cells:
@@ -33,8 +41,10 @@ def add_arterial_mesh(plotter, model, color_map="viridis"):
 
     valid = np.isfinite(radii)
     if not valid.any():
-        plotter.add_mesh(model, color="#1769aa", line_width=3)
-        return
+        actors.append(
+            plotter.add_mesh(model, color="#1769aa", line_width=3)
+        )
+        return actors
 
     finite_radii = radii[valid]
     minimum = float(finite_radii.min())
@@ -57,20 +67,25 @@ def add_arterial_mesh(plotter, model, color_map="viridis"):
             continue
 
         segments = model.extract_cells(selected)
-        plotter.add_mesh(
-            segments,
-            scalars="raio",
-            cmap=COLOR_MAPS[color_map],
-            clim=color_limits,
-            line_width=float(line_width),
-            show_scalar_bar=not color_bar_added,
-            scalar_bar_args={"title": "Raio dos vasos"},
+        actors.append(
+            plotter.add_mesh(
+                segments,
+                scalars="raio",
+                cmap=COLOR_MAPS[color_map],
+                clim=color_limits,
+                line_width=float(line_width),
+                show_scalar_bar=show_scalar_bar and not color_bar_added,
+                scalar_bar_args={"title": "Raio dos vasos"},
+            )
         )
         color_bar_added = True
 
     if not valid.all():
-        plotter.add_mesh(
-            model.extract_cells(~valid),
-            color="#1769aa",
-            line_width=3,
+        actors.append(
+            plotter.add_mesh(
+                model.extract_cells(~valid),
+                color="#1769aa",
+                line_width=3,
+            )
         )
+    return actors
