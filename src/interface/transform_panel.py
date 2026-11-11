@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from interface.theme import THEME_COLORS, system_uses_dark_theme
+
 
 class TransformPanel(QFrame):
     close_requested = Signal()
@@ -24,59 +26,15 @@ class TransformPanel(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("transformPanel")
+        self._dark_theme = system_uses_dark_theme()
         self.setMinimumWidth(230)
-        self.setStyleSheet("""
-            QFrame#transformPanel { background: #ffffff; }
-            QLabel { color: #23344d; }
-            QLabel#panelTitle { font-size: 19px; font-weight: 700; }
-            QLabel#moduleHeading {
-                color: #65C8C0;
-                font-size: 15px;
-                font-weight: 700;
-            }
-            QLabel#mutedText { color: #B8C7D3; }
-            QFrame#moduleCard {
-                background: #f7f9fc;
-                border: 1px solid #e2e8f0;
-                border-radius: 10px;
-            }
-            QPushButton {
-                min-height: 34px;
-                padding: 0 10px;
-                border: 1px solid #d5deea;
-                border-radius: 7px;
-                background: #ffffff;
-                color: #23344d;
-            }
-            QPushButton:hover { background: #edf4fb; }
-            QPushButton#primaryButton {
-                background: #1769aa;
-                border: none;
-                color: #ffffff;
-                font-weight: 600;
-            }
-            QPushButton#primaryButton:hover { background: #12588f; }
-            QSlider::groove:horizontal {
-                height: 6px;
-                background: #dce3ed;
-                border-radius: 3px;
-            }
-            QSlider::handle:horizontal {
-                width: 16px;
-                margin: -5px 0;
-                background: #1769aa;
-                border-radius: 8px;
-            }
-        """)
 
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
         header = QFrame()
-        header.setStyleSheet(
-            "background: #f5f8fc; border-bottom: 1px solid #e2e8f0;"
-        )
+        self._header = header
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(18, 12, 12, 12)
         title = QLabel("Transformar cena")
@@ -190,6 +148,59 @@ class TransformPanel(QFrame):
 
         scroll_area.setWidget(content)
         root_layout.addWidget(scroll_area, stretch=1)
+        self.set_dark_theme(self._dark_theme)
+
+    def set_dark_theme(self, dark):
+        self._dark_theme = dark
+        colors = THEME_COLORS[dark]
+        self.setStyleSheet(f"""
+            QFrame#transformPanel {{ background: {colors["surface"]}; }}
+            QLabel {{ color: {colors["text"]}; }}
+            QLabel#panelTitle {{ font-size: 19px; font-weight: 700; }}
+            QLabel#moduleHeading {{
+                color: {colors["accent"]};
+                font-size: 15px;
+                font-weight: 700;
+            }}
+            QLabel#mutedText {{ color: {colors["muted"]}; }}
+            QFrame#moduleCard {{
+                background: {colors["card"]};
+                border: 1px solid {colors["divider"]};
+                border-radius: 10px;
+            }}
+            QPushButton {{
+                min-height: 34px;
+                padding: 0 10px;
+                border: 1px solid {colors["border"]};
+                border-radius: 7px;
+                background: {colors["control"]};
+                color: {colors["text"]};
+            }}
+            QPushButton:hover {{ background: {colors["control_hover"]}; }}
+            QPushButton#primaryButton {{
+                background: #1769aa;
+                border: none;
+                color: #ffffff;
+                font-weight: 600;
+            }}
+            QPushButton#primaryButton:hover {{ background: #12588f; }}
+            QSlider::groove:horizontal {{
+                height: 6px;
+                background: {colors["border"]};
+                border-radius: 3px;
+            }}
+            QSlider::handle:horizontal {{
+                width: 16px;
+                margin: -5px 0;
+                background: {colors["accent"]};
+                border-radius: 8px;
+            }}
+            QCheckBox {{ color: {colors["text"]}; }}
+        """)
+        self._header.setStyleSheet(
+            f"background: {colors['header']}; "
+            f"border-bottom: 1px solid {colors['divider']};"
+        )
 
     @staticmethod
     def _section_heading(text):

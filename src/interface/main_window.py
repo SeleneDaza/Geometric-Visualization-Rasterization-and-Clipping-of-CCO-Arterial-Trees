@@ -3,6 +3,7 @@ from pathlib import Path
 from PySide6.QtCore import QThread, Signal, Qt
 from PySide6.QtGui import QAction, QGuiApplication
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -20,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from interface.theme import THEME_COLORS, system_uses_dark_theme
 from interface.visualization_surface import VisualizationSurface
 
 
@@ -31,17 +33,8 @@ DATA_2D_FOLDER = PROJECT_ROOT / "data" / "2D"
 class _StartupLoadingScreen(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setStyleSheet("""
-            QWidget#startupLoading {
-                background: #f5f8fc;
-            }
-            QLabel {
-                color: #23344d;
-                font-size: 15px;
-                font-weight: 600;
-            }
-        """)
         self.setObjectName("startupLoading")
+        self.set_dark_theme(system_uses_dark_theme())
 
         loading_layout = QVBoxLayout(self)
         loading_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -64,6 +57,25 @@ class _StartupLoadingScreen(QWidget):
     def show_error(self, message):
         self.loading_label.setText(message)
         self.loading_indicator.hide()
+
+    def set_dark_theme(self, dark):
+        colors = THEME_COLORS[dark]
+        self.setStyleSheet(f"""
+            QWidget#startupLoading {{
+                background: {colors["window"]};
+            }}
+            QLabel {{
+                color: {colors["text"]};
+                font-size: 15px;
+                font-weight: 600;
+            }}
+            QProgressBar {{
+                border: 1px solid {colors["border"]};
+                border-radius: 4px;
+                background: {colors["control"]};
+            }}
+            QProgressBar::chunk {{ background: {colors["accent"]}; }}
+        """)
 
 
 class _ApplicationInitializer(QThread):
@@ -124,109 +136,12 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("Laboratório de Gráficos Arteriais")
         self.resize(1200, 750)
-        self.setStyleSheet("""
-            QMainWindow {
-                background: #F1F4F8;
-            }
-
-            QFrame#sidebar {
-                background: #202B36;
-                border-right: 1px solid #344452;
-            }
-
-            QLabel {
-                color: #DCE5EC;
-                font-size: 13px;
-            }
-
-            QLabel#appTitle {
-                color: #FFFFFF;
-                font-size: 17px;
-                font-weight: 700;
-            }
-
-            QLabel#sectionTitle {
-                color: #65C8C0;
-                font-size: 13px;
-                font-weight: 700;
-                margin-top: 5px;
-            }
-
-            QLabel#statusLabel {
-                color: #B8C7D3;
-            }
-
-            QPushButton {
-                min-height: 36px;
-                padding: 0 10px;
-                border: 1px solid #435565;
-                border-radius: 7px;
-                background: #2D3B49;
-                color: #F4F7FA;
-                font-size: 13px;
-                font-weight: 600;
-            }
-
-            QPushButton:hover {
-                background: #3B5262;
-                border: 1px solid #65C8C0;
-            }
-
-            QPushButton:pressed {
-                background: #168C87;
-            }
-
-            QComboBox {
-                min-height: 34px;
-                border: 1px solid #435565;
-                border-radius: 7px;
-                padding: 0 8px;
-                background: #2D3B49;
-                color: #F4F7FA;
-            }
-
-            QComboBox:hover {
-                border: 1px solid #65C8C0;
-            }
-
-            QComboBox QAbstractItemView {
-                background: #2D3B49;
-                color: #F4F7FA;
-                selection-background-color: #168C87;
-                selection-color: #FFFFFF;
-            }
-
-            QCheckBox {
-                color: #DCE5EC;
-                spacing: 8px;
-            }
-
-            QCheckBox::indicator {
-                width: 16px;
-                height: 16px;
-            }
-
-            QScrollArea {
-                border: none;
-                background: transparent;
-            }
-
-            QScrollBar:vertical {
-                background: #202B36;
-                width: 8px;
-                margin: 0;
-            }
-
-            QScrollBar::handle:vertical {
-                background: #526575;
-                border-radius: 4px;
-                min-height: 25px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background: #65C8C0;
-            }
-        """)
+        self._dark_theme = system_uses_dark_theme()
+        self._style_hints = QApplication.styleHints()
+        self._style_hints.colorSchemeChanged.connect(
+            self._system_theme_changed
+        )
+        self._apply_theme()
 
         self.loader = None
         self._loader_class = None
@@ -236,7 +151,91 @@ class MainWindow(QMainWindow):
         self._translation_actions = []
 
         self._create_interface()
+        self._apply_theme()
         self._initialize_application()
+
+    def _system_theme_changed(self, *_):
+        self._apply_theme()
+
+    def _apply_theme(self):
+        self._dark_theme = system_uses_dark_theme()
+        colors = THEME_COLORS[self._dark_theme]
+        self.setStyleSheet(f"""
+            QMainWindow {{ background: {colors["window"]}; }}
+            QFrame#sidebar {{
+                background: {colors["sidebar"]};
+                border-right: 1px solid {colors["divider"]};
+            }}
+            QLabel {{ color: {colors["text"]}; font-size: 13px; }}
+            QLabel#appTitle {{
+                color: {colors["text"]};
+                font-size: 17px;
+                font-weight: 700;
+            }}
+            QLabel#sectionTitle {{
+                color: {colors["accent"]};
+                font-size: 13px;
+                font-weight: 700;
+                margin-top: 5px;
+            }}
+            QLabel#statusLabel {{ color: {colors["muted"]}; }}
+            QPushButton {{
+                min-height: 36px;
+                padding: 0 10px;
+                border: 1px solid {colors["border"]};
+                border-radius: 7px;
+                background: {colors["control"]};
+                color: {colors["text"]};
+                font-size: 13px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background: {colors["control_hover"]};
+                border-color: {colors["accent"]};
+            }}
+            QPushButton:pressed {{ background: {colors["selection"]}; }}
+            QComboBox {{
+                min-height: 34px;
+                border: 1px solid {colors["border"]};
+                border-radius: 7px;
+                padding: 0 8px;
+                background: {colors["control"]};
+                color: {colors["text"]};
+            }}
+            QComboBox:hover {{ border-color: {colors["accent"]}; }}
+            QComboBox QAbstractItemView {{
+                background: {colors["control"]};
+                color: {colors["text"]};
+                selection-background-color: {colors["selection"]};
+                selection-color: {colors["selection_text"]};
+            }}
+            QCheckBox {{ color: {colors["text"]}; spacing: 8px; }}
+            QCheckBox::indicator {{ width: 16px; height: 16px; }}
+            QScrollArea {{ border: none; background: transparent; }}
+            QScrollBar:vertical {{
+                background: {colors["scrollbar"]};
+                width: 8px;
+                margin: 0;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {colors["scrollbar_handle"]};
+                border-radius: 4px;
+                min-height: 25px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: {colors["accent"]};
+            }}
+        """)
+        if hasattr(self, "_loading_screen"):
+            self._loading_screen.set_dark_theme(self._dark_theme)
+        if hasattr(self, "visualization_surface"):
+            self.visualization_surface.set_dark_theme(self._dark_theme)
+            self.visualization_surface.didactic_panel.set_dark_theme(
+                self._dark_theme
+            )
+            self.visualization_surface.transform_panel.set_dark_theme(
+                self._dark_theme
+            )
 
     def _create_interface(self):
         self._root_stack = QStackedWidget()

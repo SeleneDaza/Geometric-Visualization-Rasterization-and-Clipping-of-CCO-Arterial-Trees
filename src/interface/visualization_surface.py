@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from interface.didactic_panel import DidacticPanel
+from interface.theme import THEME_COLORS
 from interface.transform_panel import TransformPanel
 
 
@@ -35,15 +36,6 @@ class VisualizationSurface(QWidget):
         self._content_splitter.addWidget(self.viewer_container)
 
         self.viewer_title = QLabel(self)
-        self.viewer_title.setStyleSheet("""
-            QLabel {
-                background: rgba(255, 255, 255, 220);
-                color: #23344d;
-                border-radius: 6px;
-                padding: 6px 10px;
-                font-weight: 600;
-            }
-        """)
         self.viewer_title.setWordWrap(True)
         self.viewer_title.setMaximumWidth(420)
         self.viewer_title.hide()
@@ -192,10 +184,6 @@ class VisualizationSurface(QWidget):
         surface_layout.addWidget(self._content_splitter)
 
         self.loading_overlay = QFrame(self)
-        self.loading_overlay.setStyleSheet(
-            "QFrame { background: rgba(245, 248, 252, 235); }"
-            "QLabel { color: #23344d; font-size: 15px; font-weight: 600; }"
-        )
         loading_layout = QVBoxLayout(self.loading_overlay)
         loading_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.loading_label = QLabel("Carregando aplicação...")
@@ -208,6 +196,29 @@ class VisualizationSurface(QWidget):
         loading_layout.addWidget(self.loading_indicator)
         self.loading_overlay.setGeometry(self.rect())
         self.loading_overlay.show()
+
+    def set_dark_theme(self, dark):
+        colors = THEME_COLORS[dark]
+        self.viewer_title.setStyleSheet(f"""
+            QLabel {{
+                background: {colors["surface"]};
+                color: {colors["text"]};
+                border: 1px solid {colors["divider"]};
+                border-radius: 6px;
+                padding: 6px 10px;
+                font-weight: 600;
+            }}
+        """)
+        overlay = "#202b36" if dark else "#f5f8fc"
+        self.loading_overlay.setStyleSheet(
+            f"QFrame {{ background: rgba({self._rgb(overlay)}, 235); }}"
+            f"QLabel {{ color: {colors['text']}; "
+            "font-size: 15px; font-weight: 600; }"
+        )
+
+    @staticmethod
+    def _rgb(color):
+        return ", ".join(str(int(color[index:index + 2], 16)) for index in (1, 3, 5))
 
     def set_viewers(self, viewer_2d, viewer_3d):
         self.viewer_container.addWidget(viewer_2d)

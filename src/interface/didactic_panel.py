@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
 )
 
+from interface.theme import THEME_COLORS, system_uses_dark_theme
 from rasterization.bresenham import trace_bresenham_line
 from rasterization.scanline_fill import scanline_fill
 
@@ -29,25 +30,6 @@ class CollapsibleSection(QFrame):
     def __init__(self, title, content, parent=None):
         super().__init__(parent)
         self.setObjectName("moduleSection")
-        self.setStyleSheet("""
-            QFrame#moduleSection {
-                background: #ffffff;
-                border: 1px solid #e2e8f0;
-                border-radius: 9px;
-            }
-            QToolButton {
-                border: none;
-                padding: 9px 10px;
-                color: #23344d;
-                font-size: 14px;
-                font-weight: 650;
-                text-align: left;
-            }
-            QToolButton:hover { background: #f5f8fc; }
-        """)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
         self.toggle_button = QToolButton()
         self.toggle_button.setText(title)
         self.toggle_button.setToolButtonStyle(
@@ -56,9 +38,6 @@ class CollapsibleSection(QFrame):
         self.toggle_button.setArrowType(Qt.ArrowType.RightArrow)
         self.toggle_button.setCheckable(True)
         body = QWidget()
-        # body_layout = QVBoxLayout(body)
-        # body_layout.setContentsMargins(8, 0, 8, 8)
-        # body_layout.addWidget(content)
         body_layout = QVBoxLayout(body)
         body_layout.setContentsMargins(8, 0, 8, 8)
         body_layout.setSizeConstraint(
@@ -72,8 +51,30 @@ class CollapsibleSection(QFrame):
                 Qt.ArrowType.DownArrow if checked else Qt.ArrowType.RightArrow
             )
         )
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         layout.addWidget(self.toggle_button)
         layout.addWidget(body)
+
+    def set_dark_theme(self, dark):
+        colors = THEME_COLORS[dark]
+        self.setStyleSheet(f"""
+            QFrame#moduleSection {{
+                background: {colors["surface"]};
+                border: 1px solid {colors["divider"]};
+                border-radius: 9px;
+            }}
+            QToolButton {{
+                border: none;
+                padding: 9px 10px;
+                color: {colors["text"]};
+                font-size: 14px;
+                font-weight: 650;
+                text-align: left;
+            }}
+            QToolButton:hover {{ background: {colors["header"]}; }}
+        """)
 
     def set_expanded(self, expanded):
         self.toggle_button.setChecked(bool(expanded))
@@ -87,6 +88,11 @@ class RasterizationCanvas(QWidget):
         self._end = None
         self._pixels = []
         self._active_pixel = None
+        self._dark_theme = False
+
+    def set_dark_theme(self, dark):
+        self._dark_theme = dark
+        self.update()
 
     def set_line(self, start, end, pixels, active_pixel=None):
         self._start = start
@@ -98,10 +104,13 @@ class RasterizationCanvas(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.fillRect(self.rect(), QColor("#f5f8fc"))
+        background = "#202b36" if self._dark_theme else "#f5f8fc"
+        text = "#b8c7d3" if self._dark_theme else "#687386"
+        grid = "#435565" if self._dark_theme else "#dce3ed"
+        painter.fillRect(self.rect(), QColor(background))
 
         if self._start is None or self._end is None:
-            painter.setPen(QColor("#687386"))
+            painter.setPen(QColor(text))
             painter.drawText(
                 self.rect(),
                 Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap,
@@ -135,7 +144,7 @@ class RasterizationCanvas(QWidget):
             )
 
         if cell_size >= 8:
-            painter.setPen(QPen(QColor("#dce3ed"), 1))
+            painter.setPen(QPen(QColor(grid), 1))
             for column in range(columns + 1):
                 x = left + column * cell_size
                 painter.drawLine(int(x), int(top), int(x), int(top + grid_height))
@@ -493,14 +502,6 @@ class ArterialClippingModule(QFrame):
             "Alterna o destaque dos segmentos fora da janela (E), "
             "sem desativar o modo de recorte."
         )
-        self.exterior_button.setStyleSheet("""
-            QPushButton:checked {
-                background: #fff1e8;
-                border-color: #d95f02;
-                color: #8f3700;
-                font-weight: 600;
-            }
-        """)
         self.exterior_button.toggled.connect(
             self.exterior_highlight_requested.emit
         )
@@ -950,56 +951,14 @@ class DidacticPanel(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("didacticPanel")
-        self.setStyleSheet("""
-            QFrame#didacticPanel { background: #ffffff; }
-            QLabel { color: #23344d; }
-            QLabel#panelTitle { font-size: 19px; font-weight: 700; }
-            QLabel#moduleHeading { font-size: 15px; font-weight: 650; }
-            QLabel#mutedText { color: #687386; }
-            QFrame#moduleCard {
-                background: #f7f9fc;
-                border: 1px solid #e2e8f0;
-                border-radius: 10px;
-            }
-            QPushButton {
-                min-height: 34px;
-                padding: 0 10px;
-                border: 1px solid #d5deea;
-                border-radius: 7px;
-                background: #ffffff;
-                color: #23344d;
-            }
-            QPushButton:hover { background: #edf4fb; }
-            QPushButton#primaryButton {
-                background: #1769aa;
-                border: none;
-                color: #ffffff;
-                font-weight: 600;
-            }
-            QPushButton#primaryButton:hover { background: #12588f; }
-            QSpinBox {
-                min-height: 30px;
-                border: 1px solid #d5deea;
-                border-radius: 6px;
-                padding: 0 4px;
-            }
-            QComboBox {
-                min-height: 30px;
-                border: 1px solid #d5deea;
-                border-radius: 6px;
-                padding: 0 6px;
-                background: #ffffff;
-            }
-        """)
+        self._dark_theme = system_uses_dark_theme()
 
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
         header = QFrame()
-        header.setStyleSheet(
-            "background: #f5f8fc; border-bottom: 1px solid #e2e8f0;"
-        )
+        self._header = header
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(18, 12, 12, 12)
         title = QLabel("Modo didático")
@@ -1084,6 +1043,98 @@ class DidacticPanel(QFrame):
 
         self.scroll_area.setWidget(content)
         root_layout.addWidget(self.scroll_area, stretch=1)
+        self.set_dark_theme(self._dark_theme)
+
+    def set_dark_theme(self, dark):
+        self._dark_theme = dark
+        colors = THEME_COLORS[dark]
+        self.setStyleSheet(f"""
+            QFrame#didacticPanel {{ background: {colors["surface"]}; }}
+            QLabel {{ color: {colors["text"]}; }}
+            QLabel#panelTitle {{ font-size: 19px; font-weight: 700; }}
+            QLabel#moduleHeading {{
+                color: {colors["accent"]};
+                font-size: 15px;
+                font-weight: 650;
+            }}
+            QLabel#mutedText {{ color: {colors["muted"]}; }}
+            QFrame#moduleCard {{
+                background: {colors["card"]};
+                border: 1px solid {colors["divider"]};
+                border-radius: 10px;
+            }}
+            QPushButton {{
+                min-height: 34px;
+                padding: 0 10px;
+                border: 1px solid {colors["border"]};
+                border-radius: 7px;
+                background: {colors["control"]};
+                color: {colors["text"]};
+            }}
+            QPushButton:hover {{ background: {colors["control_hover"]}; }}
+            QPushButton#primaryButton {{
+                background: #1769aa;
+                border: none;
+                color: #ffffff;
+                font-weight: 600;
+            }}
+            QPushButton#primaryButton:hover {{ background: #12588f; }}
+            QSpinBox {{
+                min-height: 30px;
+                border: 1px solid {colors["border"]};
+                border-radius: 6px;
+                padding: 0 4px;
+                background: {colors["control"]};
+                color: {colors["text"]};
+            }}
+            QComboBox {{
+                min-height: 30px;
+                border: 1px solid {colors["border"]};
+                border-radius: 6px;
+                padding: 0 6px;
+                background: {colors["control"]};
+                color: {colors["text"]};
+            }}
+            QComboBox:hover {{ border-color: {colors["accent"]}; }}
+            QComboBox QAbstractItemView {{
+                background: {colors["control"]};
+                color: {colors["text"]};
+                selection-background-color: {colors["selection"]};
+                selection-color: {colors["selection_text"]};
+                outline: 0;
+            }}
+            QComboBox QAbstractItemView::item {{
+                min-height: 28px;
+                padding: 4px 8px;
+            }}
+            QTableWidget {{
+                background: {colors["control"]};
+                color: {colors["text"]};
+                gridline-color: {colors["divider"]};
+                selection-background-color: {colors["selection"]};
+                selection-color: {colors["selection_text"]};
+            }}
+            QHeaderView::section {{
+                background: {colors["header"]};
+                color: {colors["text"]};
+                border: 1px solid {colors["divider"]};
+            }}
+        """)
+        self._header.setStyleSheet(
+            f"background: {colors['header']}; "
+            f"border-bottom: 1px solid {colors['divider']};"
+        )
+        self.clipping_module.exterior_button.setStyleSheet(f"""
+            QPushButton:checked {{
+                background: {"#49352a" if dark else "#fff1e8"};
+                border-color: #d95f02;
+                color: {"#ffd5b5" if dark else "#8f3700"};
+                font-weight: 600;
+            }}
+        """)
+        self.bresenham_module.canvas.set_dark_theme(dark)
+        for section in self.sections.values():
+            section.set_dark_theme(dark)
 
     @staticmethod
     def _collapsible_section(title, content):
