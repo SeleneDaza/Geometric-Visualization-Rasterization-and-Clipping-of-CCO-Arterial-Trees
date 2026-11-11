@@ -29,8 +29,12 @@ class TransformPanel(QFrame):
             QFrame#transformPanel { background: #ffffff; }
             QLabel { color: #23344d; }
             QLabel#panelTitle { font-size: 19px; font-weight: 700; }
-            QLabel#moduleHeading { font-size: 15px; font-weight: 650; }
-            QLabel#mutedText { color: #687386; }
+            QLabel#moduleHeading {
+                color: #65C8C0;
+                font-size: 15px;
+                font-weight: 700;
+            }
+            QLabel#mutedText { color: #B8C7D3; }
             QFrame#moduleCard {
                 background: #f7f9fc;
                 border: 1px solid #e2e8f0;

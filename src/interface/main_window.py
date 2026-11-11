@@ -125,30 +125,106 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Laboratório de Gráficos Arteriais")
         self.resize(1200, 750)
         self.setStyleSheet("""
-            QMainWindow { background: #f5f8fc; }
-            QFrame#sidebar {
-                background: #ffffff;
-                border-right: 1px solid #e2e8f0;
+            QMainWindow {
+                background: #F1F4F8;
             }
-            QLabel { color: #23344d; }
-            QLabel#appTitle { font-size: 19px; font-weight: 700; }
-            QLabel#sectionTitle { font-size: 14px; font-weight: 650; }
-            QLabel#statusLabel { color: #52647a; }
+
+            QFrame#sidebar {
+                background: #202B36;
+                border-right: 1px solid #344452;
+            }
+
+            QLabel {
+                color: #DCE5EC;
+                font-size: 13px;
+            }
+
+            QLabel#appTitle {
+                color: #FFFFFF;
+                font-size: 17px;
+                font-weight: 700;
+            }
+
+            QLabel#sectionTitle {
+                color: #65C8C0;
+                font-size: 13px;
+                font-weight: 700;
+                margin-top: 5px;
+            }
+
+            QLabel#statusLabel {
+                color: #B8C7D3;
+            }
+
             QPushButton {
                 min-height: 36px;
                 padding: 0 10px;
-                border: 1px solid #d5deea;
+                border: 1px solid #435565;
                 border-radius: 7px;
-                background: #ffffff;
-                color: #23344d;
+                background: #2D3B49;
+                color: #F4F7FA;
+                font-size: 13px;
+                font-weight: 600;
             }
-            QPushButton:hover { background: #edf4fb; }
+
+            QPushButton:hover {
+                background: #3B5262;
+                border: 1px solid #65C8C0;
+            }
+
+            QPushButton:pressed {
+                background: #168C87;
+            }
+
             QComboBox {
                 min-height: 34px;
-                border: 1px solid #d5deea;
+                border: 1px solid #435565;
                 border-radius: 7px;
                 padding: 0 8px;
-                background: #ffffff;
+                background: #2D3B49;
+                color: #F4F7FA;
+            }
+
+            QComboBox:hover {
+                border: 1px solid #65C8C0;
+            }
+
+            QComboBox QAbstractItemView {
+                background: #2D3B49;
+                color: #F4F7FA;
+                selection-background-color: #168C87;
+                selection-color: #FFFFFF;
+            }
+
+            QCheckBox {
+                color: #DCE5EC;
+                spacing: 8px;
+            }
+
+            QCheckBox::indicator {
+                width: 16px;
+                height: 16px;
+            }
+
+            QScrollArea {
+                border: none;
+                background: transparent;
+            }
+
+            QScrollBar:vertical {
+                background: #202B36;
+                width: 8px;
+                margin: 0;
+            }
+
+            QScrollBar::handle:vertical {
+                background: #526575;
+                border-radius: 4px;
+                min-height: 25px;
+            }
+
+            QScrollBar::handle:vertical:hover {
+                background: #65C8C0;
             }
         """)
 
@@ -197,6 +273,7 @@ class MainWindow(QMainWindow):
         title = QLabel("Laboratório de Gráficos Arteriais")
         title.setObjectName("appTitle")
         sidebar_content_layout.addWidget(title)
+        title.setWordWrap(True)
         sidebar_content_layout.addSpacing(10)
 
         model_title = QLabel("Selecionar modelo")
@@ -272,11 +349,19 @@ class MainWindow(QMainWindow):
         self.main_splitter.addWidget(self.visualization_surface)
         self.main_splitter.setStretchFactor(0, 0)
         self.main_splitter.setStretchFactor(1, 1)
-        self.main_splitter.setSizes([260, 940])
+        self.main_splitter.setSizes([290, 910])
         main_layout.addWidget(self.main_splitter)
         self._main_interface = central_widget
         self._root_stack.addWidget(self._main_interface)
         self._root_stack.setCurrentWidget(self._loading_screen)
+
+        # Permite selecionar e copiar os textos da interface
+        for label in self.findChildren(QLabel):
+            label.setTextInteractionFlags(
+                Qt.TextInteractionFlag.TextSelectableByMouse |
+                Qt.TextInteractionFlag.TextSelectableByKeyboard
+            )
+            label.setCursor(Qt.CursorShape.IBeamCursor)
 
     def _connect_transform_controls(self):
         panel = self.visualization_surface.transform_panel

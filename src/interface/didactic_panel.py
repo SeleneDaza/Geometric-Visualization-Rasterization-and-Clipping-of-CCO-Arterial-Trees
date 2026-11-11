@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
     QToolButton,
     QVBoxLayout,
     QWidget,
+    QLayout,
+    QSizePolicy,
 )
 
 from rasterization.bresenham import trace_bresenham_line
@@ -54,8 +56,14 @@ class CollapsibleSection(QFrame):
         self.toggle_button.setArrowType(Qt.ArrowType.RightArrow)
         self.toggle_button.setCheckable(True)
         body = QWidget()
+        # body_layout = QVBoxLayout(body)
+        # body_layout.setContentsMargins(8, 0, 8, 8)
+        # body_layout.addWidget(content)
         body_layout = QVBoxLayout(body)
         body_layout.setContentsMargins(8, 0, 8, 8)
+        body_layout.setSizeConstraint(
+            QLayout.SizeConstraint.SetMinimumSize
+        )
         body_layout.addWidget(content)
         body.hide()
         self.toggle_button.toggled.connect(body.setVisible)
@@ -202,11 +210,25 @@ class BresenhamModule(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 14, 14, 14)
 
-        heading_row = QHBoxLayout()
+        # heading_row = QHBoxLayout()
+        # heading = QLabel("Algoritmo de Bresenham")
+        # heading.setObjectName("moduleHeading")
+        # heading_row.addWidget(heading)
+        # heading_row.addStretch()
+        # self.inspect_button = QPushButton("Inspecionar artéria")
+        # self.inspect_button.setToolTip(
+        #     "Ativa a seleção de uma artéria no visualizador 2D (I)"
+        # )
+        # self.inspect_button.clicked.connect(
+        #     lambda: self.inspection_requested.emit(not self._inspection_active)
+        # )
+        # heading_row.addWidget(self.inspect_button)
+        # layout.addLayout(heading_row)
+
         heading = QLabel("Algoritmo de Bresenham")
         heading.setObjectName("moduleHeading")
-        heading_row.addWidget(heading)
-        heading_row.addStretch()
+        layout.addWidget(heading)
+
         self.inspect_button = QPushButton("Inspecionar artéria")
         self.inspect_button.setToolTip(
             "Ativa a seleção de uma artéria no visualizador 2D (I)"
@@ -214,8 +236,8 @@ class BresenhamModule(QFrame):
         self.inspect_button.clicked.connect(
             lambda: self.inspection_requested.emit(not self._inspection_active)
         )
-        heading_row.addWidget(self.inspect_button)
-        layout.addLayout(heading_row)
+        layout.addWidget(self.inspect_button)
+
         description = QLabel(
             "Escolha os pontos inicial e final para acompanhar como o "
             "algoritmo de Bresenham decide quais pixels desenhar."
@@ -290,13 +312,22 @@ class BresenhamModule(QFrame):
         self.iteration_table.cellClicked.connect(self._select_iteration)
         layout.addWidget(self.iteration_table)
 
+    # @staticmethod
+    # def _coordinate_input(value):
+    #     field = QSpinBox()
+    #     field.setRange(-10000, 10000)
+    #     field.setValue(value)
+    #     field.setMinimumWidth(80)
+    #     field.setMaximumWidth(140)
+    #     return field
+
     @staticmethod
     def _coordinate_input(value):
         field = QSpinBox()
         field.setRange(-10000, 10000)
         field.setValue(value)
-        field.setMinimumWidth(80)
-        field.setMaximumWidth(140)
+        field.setMinimumWidth(0)
+        field.setMaximumWidth(110)
         return field
 
     def rasterize(self):
@@ -393,11 +424,25 @@ class ArterialClippingModule(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 14, 14, 14)
 
-        heading_row = QHBoxLayout()
+        # heading_row = QHBoxLayout()
+        # heading = QLabel("Recorte de artérias")
+        # heading.setObjectName("moduleHeading")
+        # heading_row.addWidget(heading)
+        # heading_row.addStretch()
+        # self.mode_button = QPushButton("Desenhar janela (C)")
+        # self.mode_button.setToolTip(
+        #     "Ativa o desenho de uma janela retangular no visualizador 2D (C)"
+        # )
+        # self.mode_button.clicked.connect(
+        #     lambda: self.mode_requested.emit(not self._mode_active)
+        # )
+        # heading_row.addWidget(self.mode_button)
+        # layout.addLayout(heading_row)
+
         heading = QLabel("Recorte de artérias")
         heading.setObjectName("moduleHeading")
-        heading_row.addWidget(heading)
-        heading_row.addStretch()
+        layout.addWidget(heading)
+
         self.mode_button = QPushButton("Desenhar janela (C)")
         self.mode_button.setToolTip(
             "Ativa o desenho de uma janela retangular no visualizador 2D (C)"
@@ -405,25 +450,42 @@ class ArterialClippingModule(QFrame):
         self.mode_button.clicked.connect(
             lambda: self.mode_requested.emit(not self._mode_active)
         )
-        heading_row.addWidget(self.mode_button)
-        layout.addLayout(heading_row)
+        layout.addWidget(self.mode_button)
 
-        algorithm_row = QHBoxLayout()
-        algorithm_row.addWidget(QLabel("Algoritmo:"))
+        # algorithm_row = QHBoxLayout()
+        # algorithm_row.addWidget(QLabel("Algoritmo:"))
+        # self.algorithm_selector = QComboBox()
+        # self.algorithm_selector.addItem(
+        #     "Cohen–Sutherland",
+        #     "cohen_sutherland",
+        # )
+        # self.algorithm_selector.addItem("Liang–Barsky", "liang_barsky")
+        # self.algorithm_selector.setToolTip(
+        #     "Escolha o algoritmo usado para recortar as artérias."
+        # )
+        # self.algorithm_selector.currentIndexChanged.connect(
+        #     self._emit_algorithm_changed
+        # )
+        # algorithm_row.addWidget(self.algorithm_selector, stretch=1)
+        # layout.addLayout(algorithm_row)
+
+        algorithm_label = QLabel("Algoritmo:")
+        layout.addWidget(algorithm_label)
+
         self.algorithm_selector = QComboBox()
         self.algorithm_selector.addItem(
             "Cohen–Sutherland",
             "cohen_sutherland",
         )
         self.algorithm_selector.addItem("Liang–Barsky", "liang_barsky")
+        self.algorithm_selector.setMinimumWidth(0)
         self.algorithm_selector.setToolTip(
             "Escolha o algoritmo usado para recortar as artérias."
         )
         self.algorithm_selector.currentIndexChanged.connect(
             self._emit_algorithm_changed
         )
-        algorithm_row.addWidget(self.algorithm_selector, stretch=1)
-        layout.addLayout(algorithm_row)
+        layout.addWidget(self.algorithm_selector)
 
         self.exterior_button = QPushButton("Destacar exteriores (E)")
         self.exterior_button.setCheckable(True)
@@ -612,11 +674,26 @@ class ScanlineModule(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 14, 14, 14)
 
-        heading_row = QHBoxLayout()
+        # heading_row = QHBoxLayout()
+        # heading = QLabel("Preenchimento Scanline (ET / AET)")
+        # heading.setObjectName("moduleHeading")
+        # heading_row.addWidget(heading)
+        # heading_row.addStretch()
+        # self.mode_button = QPushButton("Delimitar ROI (R)")
+        # self.mode_button.setToolTip(
+        #     "Ativa a delimitação de uma ROI no visualizador 2D (R)"
+        # )
+        # self.mode_button.clicked.connect(
+        #     lambda: self.mode_requested.emit(not self._mode_active)
+        # )
+        # heading_row.addWidget(self.mode_button)
+        # layout.addLayout(heading_row)
+
         heading = QLabel("Preenchimento Scanline (ET / AET)")
         heading.setObjectName("moduleHeading")
-        heading_row.addWidget(heading)
-        heading_row.addStretch()
+        heading.setWordWrap(True)
+        layout.addWidget(heading)
+
         self.mode_button = QPushButton("Delimitar ROI (R)")
         self.mode_button.setToolTip(
             "Ativa a delimitação de uma ROI no visualizador 2D (R)"
@@ -624,8 +701,7 @@ class ScanlineModule(QFrame):
         self.mode_button.clicked.connect(
             lambda: self.mode_requested.emit(not self._mode_active)
         )
-        heading_row.addWidget(self.mode_button)
-        layout.addLayout(heading_row)
+        layout.addWidget(self.mode_button)
 
         description = QLabel(
             "Ative o modo e clique na figura para marcar os vértices. "
@@ -635,7 +711,7 @@ class ScanlineModule(QFrame):
         description.setWordWrap(True)
         layout.addWidget(description)
 
-        controls = QHBoxLayout()
+        controls = QVBoxLayout()
         self.finish_button = QPushButton("Finalizar polígono")
         self.finish_button.clicked.connect(self.roi_finish_requested)
         self.finish_button.setEnabled(False)
@@ -651,31 +727,76 @@ class ScanlineModule(QFrame):
         self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
 
-        tables = QHBoxLayout()
+        # tables = QHBoxLayout()
+        # self.edge_table = self._make_table(
+        #     ("Y mín.", "Y máx.", "X inicial", "1/m")
+        # )
+        # self.active_edge_table = self._make_table(
+        #     ("Y máx.", "X actual", "1/m")
+        # )
+        # tables.addWidget(self.edge_table)
+        # tables.addWidget(self.active_edge_table)
+        # layout.addLayout(tables)
+
+        tables = QVBoxLayout()
+
         self.edge_table = self._make_table(
             ("Y mín.", "Y máx.", "X inicial", "1/m")
         )
+
         self.active_edge_table = self._make_table(
             ("Y máx.", "X actual", "1/m")
         )
+
         tables.addWidget(self.edge_table)
         tables.addWidget(self.active_edge_table)
+
         layout.addLayout(tables)
 
         self._edge_rows = []
+
+    # @staticmethod
+    # def _make_table(headers):
+    #     table = QTableWidget(0, len(headers))
+    #     table.setHorizontalHeaderLabels(headers)
+    #     table.verticalHeader().setVisible(False)
+    #     table.horizontalHeader().setSectionResizeMode(
+    #         QHeaderView.ResizeMode.Stretch
+    #     )
+    #     table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+    #     table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+    #     table.setAlternatingRowColors(True)
+    #     table.setMinimumHeight(100)
+    #     return table
 
     @staticmethod
     def _make_table(headers):
         table = QTableWidget(0, len(headers))
         table.setHorizontalHeaderLabels(headers)
+
         table.verticalHeader().setVisible(False)
-        table.horizontalHeader().setSectionResizeMode(
+
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
         )
-        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        header.setMinimumSectionSize(0)
+
+        table.setMinimumWidth(0)
+        table.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Expanding
+        )
+
+        table.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+        table.setSelectionMode(
+            QAbstractItemView.SelectionMode.NoSelection
+        )
         table.setAlternatingRowColors(True)
         table.setMinimumHeight(100)
+
         return table
 
     def set_mode_active(self, active):
@@ -901,6 +1022,9 @@ class DidacticPanel(QFrame):
         content_layout = QVBoxLayout(content)
         content_layout.setContentsMargins(16, 16, 16, 20)
         content_layout.setSpacing(14)
+        content_layout.setSizeConstraint(
+        QLayout.SizeConstraint.SetMinimumSize
+    )
 
         self.bresenham_module = BresenhamModule()
         self.bresenham_section = self._collapsible_section(
