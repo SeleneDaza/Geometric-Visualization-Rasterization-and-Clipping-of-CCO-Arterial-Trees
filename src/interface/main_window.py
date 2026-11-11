@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QFrame,
+    QStackedWidget,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -16,9 +17,9 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSplitter,
-    QStackedWidget,
     QVBoxLayout,
     QWidget,
+    QSlider,
 )
 
 from interface.theme import THEME_COLORS, system_uses_dark_theme
@@ -329,7 +330,6 @@ class MainWindow(QMainWindow):
         antialiasing_title = QLabel("Suavização de bordas")
         antialiasing_title.setObjectName("sectionTitle")
         sidebar_content_layout.addWidget(antialiasing_title)
-
         self.antialiasing_checkbox = QCheckBox("Ativar antialiasing (FXAA)")
         self.antialiasing_checkbox.setChecked(True)
         self.antialiasing_checkbox.setToolTip(
@@ -338,6 +338,19 @@ class MainWindow(QMainWindow):
         )
         self.antialiasing_checkbox.toggled.connect(self._update_antialiasing)
         sidebar_content_layout.addWidget(self.antialiasing_checkbox)
+        
+        thickness_title = QLabel("Diferença de grossura")
+        thickness_title.setObjectName("sectionTitle")
+        sidebar_content_layout.addWidget(thickness_title)
+
+        # Configurado de 0 a 200 (onde 100 = 1.0 e 200 = 2.0)
+        self.thickness_slider = QSlider(Qt.Orientation.Horizontal)
+        self.thickness_slider.setRange(0, 200)
+        self.thickness_slider.setValue(100)  # Inicia em 1.0 (padrão anterior)
+        self.thickness_slider.setToolTip("Ajusta a variação de espessura entre as artérias até 2.0x.")
+        self.thickness_slider.valueChanged.connect(self._update_thickness_scale)
+        sidebar_content_layout.addWidget(self.thickness_slider)
+        
         sidebar_content_layout.addStretch()
 
         self.visualization_surface = VisualizationSurface()
@@ -354,7 +367,6 @@ class MainWindow(QMainWindow):
         self._root_stack.addWidget(self._main_interface)
         self._root_stack.setCurrentWidget(self._loading_screen)
 
-        # Permite selecionar e copiar os textos da interface
         for label in self.findChildren(QLabel):
             label.setTextInteractionFlags(
                 Qt.TextInteractionFlag.TextSelectableByMouse |
@@ -595,11 +607,15 @@ class MainWindow(QMainWindow):
             self.loader = loader
             self._current_dimension = dimension
             color_map = self.color_map_selector.currentData()
+            
+            # Converte o range do slider (0-200) para a escala (0.0 - 2.0)
+            thickness_scale = self.thickness_slider.value() / 100.0
+
             if dimension == 2:
                 self.visualization_surface.viewer_container.setCurrentWidget(
                     self.viewer_2d
                 )
-                self.viewer_2d.show_model(model, color_map)
+                self.viewer_2d.show_model(model, color_map, thickness_scale=thickness_scale)
             else:
                 self.visualization_surface.viewer_container.setCurrentWidget(
                     self.viewer_3d
@@ -639,8 +655,9 @@ class MainWindow(QMainWindow):
 
         model = self.loader.get_model()
         color_map = self.color_map_selector.currentData()
+        thickness_scale = self.thickness_slider.value() / 100.0
         if self._current_dimension == 2:
-            self.viewer_2d.show_model(model, color_map)
+            self.viewer_2d.show_model(model, color_map, thickness_scale=thickness_scale)
         else:
             self.viewer_3d.set_color_map(color_map)
 
@@ -662,3 +679,19 @@ class MainWindow(QMainWindow):
         if worker in self._model_workers:
             self._model_workers.remove(worker)
         worker.deleteLater()
+
+    def _update_thickness_scale(self, value):
+        thickness_scale = value / 100.0
+        
+        if self.loader is not None and self._current_dimension == 2:
+            model = self.loader.get_model()
+            color_map = self.color_map_selector.currentData()
+            if color_map is None:
+                color_map = self.color_map_selector.currentText().lower()
+                
+            if hasattr(self.visualization_surface, "viewer_2d"):
+                self.visualization_surface.viewer_2d.show_model(
+                    model, 
+                    color_map=color_map, 
+                    thickness_scale=thickness_scale
+                )

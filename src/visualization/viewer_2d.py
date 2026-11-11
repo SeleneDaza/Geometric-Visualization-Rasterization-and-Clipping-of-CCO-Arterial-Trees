@@ -59,6 +59,7 @@ class Viewer2D(QtInteractor):
         self._roi_display_depth = 0.0
         self._roi_cell_size = 8.0
         self._color_map = "viridis"
+        self._thickness_scale = 1.0
         self._model_actors = []
         self._clipping_enabled = False
         self._clipping_algorithm = "cohen_sutherland"
@@ -82,7 +83,7 @@ class Viewer2D(QtInteractor):
         self._cell_picker = vtkCellPicker()
         self._cell_picker.SetTolerance(0.01)
 
-    def show_model(self, model, color_map="viridis"):
+    def show_model(self, model, color_map="viridis", thickness_scale=1.0):
         interactor = self.iren.interactor
         if self._inspection_observer is not None:
             interactor.RemoveObserver(self._inspection_observer)
@@ -97,6 +98,7 @@ class Viewer2D(QtInteractor):
         self._clip_dragging = False
         self._model = model
         self._color_map = color_map
+        self._thickness_scale = thickness_scale
         self.clear()
         self._model_actors.clear()
         self._clipped_actors.clear()
@@ -121,7 +123,12 @@ class Viewer2D(QtInteractor):
         self._roi_vertices.clear()
         self._roi_finalized = False
         self._apply_anti_aliasing()
-        self._model_actors = add_arterial_mesh(self, model, color_map)
+        self._model_actors = add_arterial_mesh(
+            self, 
+            model, 
+            color_map, 
+            thickness_scale=thickness_scale
+        )
         self.view_xy()
         self.reset_camera()
         self.render()
@@ -294,6 +301,7 @@ class Viewer2D(QtInteractor):
                 clipped_model,
                 self._color_map,
                 show_scalar_bar=False,
+                thickness_scale=self._thickness_scale,
             )
         if self._clipping_exterior_enabled:
             exterior_model = clip_polydata_outside_by_algorithm[
@@ -617,6 +625,7 @@ class Viewer2D(QtInteractor):
                                 clipped_model,
                                 self._color_map,
                                 show_scalar_bar=False,
+                                thickness_scale=self._thickness_scale,
                             )
                         )
         self.render()

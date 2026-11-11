@@ -22,6 +22,7 @@ def add_arterial_mesh(
     model,
     color_map="viridis",
     show_scalar_bar=True,
+    thickness_scale=1.0,  # Agora aceita até 2.0 para maior discrepância
 ):
     if color_map not in COLOR_MAPS:
         raise ValueError(f"Mapa de cores não suportado: {color_map}")
@@ -60,25 +61,37 @@ def add_arterial_mesh(
         padding = max(abs(minimum) * 1e-6, 1e-12)
         color_limits = (minimum - padding, maximum + padding)
 
-    color_bar_added = False
-    for bin_index, line_width in enumerate(_WIDTHS):
+    # --- DIFERENÇA DE GROSSURA EXPANDIDA (Até 2.0) ---
+    uniform_widths = np.full(len(_WIDTHS), 3.0)
+    full_widths = np.linspace(1.0, 12.0, len(_WIDTHS))
+    
+    # Permitimos amplificar a divergência multiplicando a inclinação por thickness_scale
+    active_widths = uniform_widths * (max(0.0, 2.0 - thickness_scale)) + full_widths * thickness_scale
+    active_widths = np.maximum(0.5, active_widths)  # Garante largura mínima segura
+    # ------------------------------------------------
+
+    for bin_index, line_width in enumerate(active_widths):
         selected = valid & (bins == bin_index)
         if not selected.any():
             continue
 
         segments = model.extract_cells(selected)
-        actors.append(
-            plotter.add_mesh(
-                segments,
-                scalars="raio",
-                cmap=COLOR_MAPS[color_map],
-                clim=color_limits,
-                line_width=float(line_width),
-                show_scalar_bar=show_scalar_bar and not color_bar_added,
-                scalar_bar_args={"title": "Raio dos vasos"},
-            )
+        actor = plotter.add_mesh(
+            segments,
+            scalars="raio",
+            cmap=COLOR_MAPS[color_map],
+            clim=color_limits,
+            line_width=float(line_width),
+            show_scalar_bar=False,
         )
-        color_bar_added = True
+        actors.append(actor)
+
+    if show_scalar_bar and valid.any() and actors:
+        plotter.add_scalar_bar(
+            title="Raio dos vasos",
+            mapper=actors[0].mapper,
+            interactive=False,
+        )
 
     if not valid.all():
         actors.append(
