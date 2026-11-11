@@ -1,96 +1,134 @@
-# Visualização Geométrica, Rasterização e Recorte de Árvores Arteriais CCO
+# Geometric Visualization, Rasterization and Clipping of CCO Arterial Trees
 
-Aplicativo para carregar e visualizar árvores arteriais CCO em formato VTK,
-em 2D ou 3D.
+Aplicação interativa desenvolvida em Python para a visualização, rasterização, transformação afim e recorte de árvores arteriais sintéticas 2D e 3D geradas pelo algoritmo *Constrained Constructive Optimization* (CCO). Trabalho Prático 1 (TP1) da disciplina de Computação Gráfica.
 
-## Requisitos funcionais
+---
 
-- **RF01 — Carregamento e análise:** o PyVista carrega arquivos `.vtk`; a
-  dimensão geométrica é determinada a partir dos pontos.
-- **RF02 — Métricas:** são exibidos o número de pontos/vértices, segmentos
-  geométricos e o intervalo do atributo de raio `raio`, quando disponível.
-- **RF03 — Primitivas:** as redes são desenhadas como segmentos de linha nos
-  visualizadores 2D e 3D.
-- **RF04 — Cor e espessura:** o raio de cada segmento controla sua cor e
-  espessura. É possível escolher os mapas Viridis, HSV ou RGB (azul-verde-
-  vermelho).
-- **RF05 — Transformações afins interativas:** no modo 3D, o painel lateral
-  permite transladar, rotacionar e redimensionar o modelo com controles
-  deslizantes. As setas com `Alt` também deslocam a cena.
-- **RF06 — Controle do observador:** o controle deslizante da câmera permite
-  escolher entre as vistas isométrica, superior, frontal e lateral. O mouse
-  também permite orbitar, deslocar e aproximar ou afastar a câmera.
-- **RF07 — Projeções:** a opção «Projeção ortográfica» alterna entre projeção
-  ortográfica e perspectiva; a perspectiva é usada inicialmente.
-- **RF08 — Inspetor/lupa de artéria:** no visualizador 2D, pressione `I` para
-  abrir o módulo de Bresenham e ativar ou desativar a seleção de um segmento
-  CCO. A grade de pixels e a tabela `pₖ` aparecem no módulo; ao escolher um
-  passo, a artéria e o pixel em análise ficam destacados na figura. O módulo
-  também permite informar manualmente os extremos de uma reta.
-- **RF09 — Preenchimento de região de interesse:** pressione `R` para ativar a
-  delimitação de um polígono ROI com cliques no visualizador 2D. Ao finalizar,
-  o contorno muda de cor, fica bloqueado para edição, e o preenchimento
-  Scanline é animado com as tabelas ET/AET atualizadas a cada linha. Use
-  «Limpar ROI» para remover o polígono. Os modos Bresenham (`I`) e ROI (`R`)
-  são mutuamente exclusivos: ativar um encerra automaticamente o outro.
-- **RF10 — Alternância de antialiasing:** a opção «Ativar antialiasing (FXAA)»
-  na barra lateral liga ou desliga a filtragem de subpixel nos visualizadores
-  2D e 3D, permitindo comparar as bordas das artérias com e sem suavização.
-- **RF11 — Recorte Cohen–Sutherland:** no modo didático 2D, a tecla `C` ou o
-  botão «Desenhar janela (C)» ativa o recorte. Arraste sobre a rede para
-  definir uma janela retangular; os segmentos visíveis dentro dela são
-  recalculados em tempo real pelo algoritmo selecionado.
-- **RF12 — Recorte de artérias paramétrico:** no painel didático 2D, selecione
-  Cohen–Sutherland ou Liang–Barsky no campo «Algoritmo». A escolha pode ser
-  alterada com o recorte ativo, e as artérias são recalculadas imediatamente
-  para a mesma janela retangular.
-- **RF13 — Alternância de vista do recorte:** pressione `E` ou use o botão
-  «Destacar exteriores (E)» para alternar, independentemente do modo de
-  desenho, o destaque laranja dos trechos externos à janela. A tecla `C`
-  continua controlando apenas o desenho do recorte.
-- **RF14 — Recorte Sutherland–Hodgman:** pressione `H` para delimitar uma ROI
-  poligonal com vértices reais selecionados nas artérias do modelo CCO e
-  recortá-la pela janela retangular definida no modo `C`. Selecione os pontos
-  na ordem do contorno, finalize o polígono no painel e arraste com o botão
-  direito para atualizar a janela sem sair do modo. A rede completa permanece
-  visível; o contorno recortado e os trechos arteriais dentro dele são
-  destacados. O HUD informa as quantidades de vértices e a limitação para
-  polígonos côncavos.
+## 👥 Integrantes do Grupo
+* Arian Selene Daza Ochoa
+* Bianca Barreto Leme
+* Karina Miyu Kinukawa
 
-## Execução
+---
 
-Instale as dependências de `requirements.txt` e execute a partir da raiz:
+## 🛠️ Tecnologia Gráfica e Bibliotecas Utilizadas
+* **Linguagem:** Python 3.10+
+* **Interface Gráfica (GUI):** PyQt5 / PySide2
+* **Manipulação de Dados Geométricos / VTK:** `vtk` ou parsers dedicados para leitura de malhas estruturadas/poligonais.
+* **Processamento Numérico:** `numpy` para representação matricial de transformações afins (homogêneas) e cálculos vetoriais.
 
-```powershell
-python src\main.py
+---
+
+## 📂 Estrutura Final do Repositório
+
+```text
+Grupo_XX/
+│
+├── src/
+│   ├── main.py
+│   │
+│   ├── core/
+│   │   ├── loader.py
+│   │   ├── model.py
+│   │   └── statistics.py
+│   │
+│   ├── visualization/
+│   │   ├── viewer_3d.py
+│   │   ├── camera.py
+│   │   └── transformations.py
+│   │
+│   ├── rasterization/
+│   │   ├── bresenham.py
+│   │   ├── scanline.py
+│   │   └── antialiasing.py
+│   │
+│   ├── clipping/
+│   │   ├── cohen_sutherland.py
+│   │   ├── liang_barsky.py
+│   │   └── sutherland_hodgman.py
+│   │
+│   └── interface/
+│       └── controls.py
+│
+├── data/
+│   ├── 3D/
+│   │   └── tree3D_Nterm064.vtk
+│   └── 2D/
+│       └── tree2D_Nterm032.vtk
+│
+├── report/
+│   ├── relatorio.tex
+│   ├── relatorio.pdf
+│   └── figures/
+│
+├── presentation/
+│   ├── apresentacao.tex
+│   └── apresentacao.pdf
+│
+└── README.md
 ```
 
-Os modelos de exemplo estão em `data\2D` e `data\3D`. Também é possível
-adicionar arquivos `.vtk` ou pastas pelo aplicativo. No visualizador 2D,
-pressione `I` para abrir o módulo de Bresenham e ativar a lupa; clique em uma
-artéria e selecione uma linha da tabela para destacar seu pixel. Pressione `I`
-novamente ou «Fechar painel» para sair do modo.
-Use «Ativar antialiasing (FXAA)» na barra lateral para alternar a suavização
-das artérias em qualquer visualizador.
-No modo 2D, pressione `C` ou abra «Modo didático» e selecione «Desenhar
-janela (C)»; escolha «Cohen–Sutherland» ou «Liang–Barsky» e arraste sobre o
-modelo para recortar os segmentos em tempo real. O algoritmo pode ser trocado
-com uma janela já desenhada.
-Com a janela definida, pressione `E` para alternar o destaque laranja dos
-trechos eliminados/externos; essa tecla não ativa nem desativa o modo de desenho.
-Para o Scanline, pressione `R`, marque pelo menos três vértices no modelo e
-selecione «Finalizar polígono». O contorno muda de cor e fica bloqueado; use
-«Limpar ROI» para recomeçar. Os módulos didáticos são expansíveis e começam
-recolhidos; ativar `I` ou `R` expande o módulo correspondente e troca o modo.
-Para o recorte de polígonos, defina primeiro a janela com `C` e pressione `H`.
-Clique sobre as artérias para selecionar ao menos três vértices reais do CCO,
-na ordem do contorno da ROI, e selecione «Finalizar polígono». A janela pode
-ser ajustada em tempo real com o botão direito; use «Limpar ROI» para
-selecionar outro polígono. A rede completa permanece no fundo e os trechos
-contidos na ROI recortada são realçados. A tecla `H` desativa o modo.
+---
 
-## Testes
+## ⚙️ Dependências e Instalação
 
-```powershell
-python -m unittest discover -s tests
+Certifique-se de ter o Python instalado em seu ambiente. Instale as dependências executando:
+
+```bash
+pip install -r requirements.txt
 ```
+*(Principais dependências: `numpy`, `PyQt5`, `vtk`)*
+
+---
+
+## 🚀 Como Executar o Programa
+
+1. Navegue até a pasta raiz do projeto.
+2. Execute o script principal através do terminal:
+
+```bash
+python src/main.py
+```
+
+---
+
+## 📂 Localização dos Arquivos VTK
+Os modelos de teste fornecidos pelo laboratório devem estar localizados nos diretórios padrão:
+* Árvores 2D: `data/2D/` (ex: `tree2D_Nterm008.vtk`, `tree2D_Nterm032.vtk`, etc.)
+* Árvores 3D: `data/3D/` (ex: `tree3D_Nterm064.vtk`, `tree3D_Nterm256.vtk`, etc.)
+
+---
+
+## ⌨️ Controles de Teclado e Mouse
+
+* **Arrastar com botão esquerdo do mouse:** Rotaciona a visualização 3D / Panorâmica 2D.
+* **Scroll do Mouse (Rodinha):** Ampliar / Reduzir zoom ($\text{Zoom In} / \text{Zoom Out}$).
+* **Teclas `R` / `r`:** Reseta a câmera e a matriz de transformação para o estado original.
+* **Teclas `1`, `2`, `3`:** Alterna entre os modos de visualização (Rasterização Bresenham, Contínuo Vetorial, Preenchimento por Scanline).
+* **Tecla `C`:** Ativa/Desativa o modo de recorte interativo (Cohen-Sutherland / Liang-Barsky).
+* **Tecla `Esc`:** Fecha a aplicação.
+
+---
+
+## 🧪 Roteiro Mínimo para Teste das Funcionalidades
+
+1. **Carregamento de Dados:** Abra o programa, acesse o menu superior e selecione um arquivo `.vtk` na pasta `data/2D/` ou `data/3D/`.
+2. **Transformações Afins:** Utilize os sliders na interface lateral para aplicar translação $(t_x, t_y)$, escala ($s$) e rotação ($\theta$) em tempo real na árvore arterial.
+3. **Rasterização:** Pressione o atalho correspondente para alternar a renderização dos segmentos utilizando o algoritmo de linha de Bresenham.
+4. **Recorte (Clipping):** Defina uma janela de recorte retangular na tela e alterne entre os algoritmos Cohen-Sutherland e Liang-Barsky para observar o comportamento do recorte dos ramos vasculares.
+
+---
+
+## 🔍 Funcionalidades: Implementação Própria vs. Bibliotecas
+
+* **Implementados pelo Grupo (Lógica Core de Computação Gráfica):**
+  * Algoritmo de Linha de Bresenham (geração de pixels a partir de pontos extremos).
+  * Preenchimento de regiões poligonais por *Scanline*.
+  * Algoritmo de recorte de segmentos Cohen-Sutherland (com codificação de região por *outcodes*).
+  * Algoritmo de recorte paramétrico de Liang-Barsky.
+  * Algoritmo de recorte de polígonos Sutherland-Hodgman.
+  * Composição de matrizes de transformação afim em coordenadas homogêneas (2D e 3D).
+
+* **Realizados com Auxílio de Bibliotecas:**
+  * Carregamento de arquivos estruturados e parsing básico do formato VTK (`vtk`).
+  * Construção de elementos de interface gráfica de usuário (janelas, botões e sliders via `PyQt5`).
