@@ -1,3 +1,5 @@
+matplotlib
+numpy
+PySide6
 pyvista
-
-pip install PySide6 pyvista pyvistaqt
+pyvistaqt
