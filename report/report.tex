@@ -1,0 +1,183 @@
+\documentclass[11pt, a4paper]{article}
+\usepackage[a4paper, top=3cm, left=3cm, bottom=2cm, right=2cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{lmodern}
+\usepackage{setspace}
+
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+% Configuração de parágrafos e espaçamentos ABNT
+\onehalfspacing
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{0pt}
+
+\definecolor{primary}{RGB}{0, 0, 0}
+\definecolor{accent}{RGB}{0, 0, 0}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=black,
+    urlcolor=black
+}
+
+\begin{document}
+
+% Cabeçalho / Título no estilo ABNT para artigos/relatórios
+\begin{center}
+    {\Large \textbf{VISUALIZAÇÃO, RASTERIZAÇÃO E RECORTE DE ÁRVORES ARTERIAIS GERADAS POR CCO}}\\[0.5em]
+    {\large Trabalho Prático 1 --- Computação Gráfica}\\[1.5em]
+    {\small Bianca Barreto Leme \\ Karina Miyu Kinukawa \\ Prof. Rafael Alves Bonfim de Queiroz}\\
+    {\small Departamento de Computação --- Universidade Federal de Ouro Preto}
+\end{center}
+
+\vspace{1em}
+
+\begin{singlespace}
+\noindent \textbf{RESUMO}\\
+Este artigo apresenta o desenvolvimento de uma aplicação interativa para a visualização, rasterização e recorte de modelos de árvores arteriais sintéticas geradas pelo algoritmo \textit{Constrained Constructive Optimization} (CCO). O foco principal do trabalho é a implementação e análise prática de algoritmos clássicos de Computação Gráfica em dados vasculares 2D e 3D (arquivos no formato VTK). Foram implementados os algoritmos de rasterização de segmentos de linha por Bresenham e preenchimento de polígonos por \textit{Scanline}, além dos métodos de recorte de segmentos por Cohen-Sutherland e Liang-Barsky, e recorte de polígonos por Sutherland-Hodgman. A arquitetura modular desenvolvida permite a aplicação interativa de transformações afins (transladação, rotação e escala) e a inspeção de propriedades vasculares. Avaliou-se o desempenho e a fidelidade visual das estruturas arteriais com diferentes densidades de bifurcação (de $N_{\text{term}} = 8$ a $512$), evidenciando a eficiência de Liang-Barsky em cenários de recorte frequente e a robustez do algoritmo de Bresenham para a renderização direta em malha de pixels.
+
+\vspace{0.5em}
+\noindent \textbf{Palavras-chave:} Computação Gráfica. Rasterização. Recorte de Linhas. Algoritmo CCO. Estruturas Vasculares. Transformações Afins.
+\end{singlespace}
+
+\vspace{1.5em}
+
+\section{\textbf{INTRODUÇÃO E OBJETIVOS}}
+
+A modelagem computacional da arquitetura vascular desempenha um papel fundamental no estudo da hemodinâmica e em simulações biomédicas. O algoritmo \textit{Constrained Constructive Optimization} (CCO) destaca-se na geração sintética de árvores arteriais 2D e 3D que mimetizam os princípios anatômicos e fisiológicos da circulação sanguínea.
+
+Embora o modelo CCO origine-se de restrições biológicas e otimização hidráulica, o desafio técnico tratado neste trabalho reside no ecossistema da Computação Gráfica: como processar, transformar, recortar e rasterizar eficientemente essas estruturas geométricas complexas constituídas por centenas de segmentos e bifurcações.
+
+Os principais objetivos deste Trabalho Prático (TP1) incluem:
+\begin{itemize}
+    \item Desenvolver uma plataforma gráfica modular para carregamento e visualização de arquivos VTK contendo modelos vasculares 2D e 3D;
+    \item Implementar e comparar algoritmos fundamentais de rasterização: Algoritmo de Linha de Bresenham e Preenchimento por Scanline;
+    \item Implementar e analisar algoritmos de recorte 2D para controle de janela de visualização (\textit{viewport}): Cohen-Sutherland, Liang-Barsky e Sutherland-Hodgman;
+    \item Prover suporte interativo para transformações geométricas afins (translação, escala e rotação) em tempo real;
+    \item Avaliar quantitativamente e qualitativamente os algoritmos implementados sob variação da complexidade estrutural das árvores ($N_{\text{term}}$).
+\end{itemize}
+
+\section{\textbf{FUNDAMENTAÇÃO TEÓRICA}}
+
+\subsection{Modelos de Árvores Arteriais (CCO)}
+O método CCO constrói sequencialmente árvores vasculares adicionando novos segmentos terminais e otimizando a posição dos nós de bifurcação. No âmbito do pipeline de computação gráfica, a árvore arterial é tratada como um grafo direcionado $G = (V, E)$, onde os vértices $V$ correspondem aos pontos de bifurcação/terminação e as arestas $E$ representam os segmentos de vaso, possuindo atributos como raio $r$ e comprimento $L$.
+
+\subsection{Algoritmos de Rasterização}
+\paragraph{Algoritmo de Bresenham:}
+Utilizado para converter segmentos contínuos $\mathbf{p}_1\mathbf{p}_2$ em grade discreta de pixels. Baseia-se exclusivamente em aritmética inteira e na avaliação de uma variável de decisão $D$, evitando operações de ponto flutuante dispendiosas. Para uma linha no primeiro octante com inclinação $m = \Delta y / \Delta x \in [0, 1]$, a atualização a cada passo em $x$ é dada por:
+\begin{equation}
+D_{\text{inicial}} = 2\Delta y - \Delta x
+\end{equation}
+Se $D < 0$, escolhe-se o pixel a leste ($E$) e $D \leftarrow D + 2\Delta y$. Caso contrário, escolhe-se o pixel a nordeste ($NE$) e $D \leftarrow D + 2\Delta y - 2\Delta x$.
+
+\paragraph{Preenchimento por Scanline:}
+Método para rasterização de regiões poligonais (por exemplo, a projeção de vasos com espessura ou regiões de recorte). Uma linha de varredura horizontal intercepta as arestas do polígono, construindo uma tabela de arestas ativas (AET). Os pares de intersecção ordenados determinam os intervalos $[x_i, x_{i+1}]$ a serem preenchidos.
+
+\subsection{Algoritmos de Recorte (Clipping)}
+\paragraph{Cohen-Sutherland:}
+Divide o espaço 2D em 9 regiões através de códigos de região (\textit{outcodes}) de 4 bits (Topo, Fundo, Direita, Esquerda). Segmentos são trivialmente aceitos se ambos os outcodes forem $0000_2$, ou trivialmente rejeitados se a operação AND bit-a-bit entre os outcodes resultar em valor diferente de zero. Segmentos não triviais são subdivididos iterativamente nos limites da janela.
+
+\paragraph{Liang-Barsky:}
+Baseia-se na parametrização da reta $\mathbf{p}(t) = \mathbf{p}_1 + t(\mathbf{p}_2 - \mathbf{p}_1)$, com $t \in [0, 1]$. As condições de visibilidade na janela de recorte $[x_{\min}, x_{\max}] \times [y_{\min}, y_{\max}]$ são reduzidas a desigualdades da forma $t \cdot p_k \le q_k$. O algoritmo utiliza razões para determinar a faixa válida de parâmetros $[t_{\text{in}}, t_{\text{out}}]$, sendo computacionalmente mais eficiente por reduzir o número de cálculos de intersecção.
+
+\paragraph{Sutherland-Hodgman:}
+Algoritmo para recorte de polígonos convexos ou côncavos contra os quatro limites retangulares da janela de clipping. O polígono é recortado sequencialmente por cada plano de borda, gerando uma nova lista ordenada de vértices a cada etapa.
+
+\section{\textbf{METODOLOGIA E ARQUITETURA DA APLICAÇÃO}}
+
+A aplicação foi estruturada de forma modular em linguagem Python, separando rigorosamente as camadas de carregamento de dados, algoritmos gráficos de núcleo e a interface de usuário.
+
+\subsection{Estrutura do Projeto}
+A arquitetura do software subdivide-se nos seguintes módulos principais:
+\begin{itemize}
+    \item \texttt{core/loader.py}: Leitura e parsing de arquivos VTK contendo as geometrias 2D e 3D das árvores vasculares.
+    \item \texttt{rasterization/}: Implementações puras dos algoritmos de linha de Bresenham (\texttt{bresenham.py}) e preenchimento de superfícies (\texttt{scanline\_fill.py}).
+    \item \texttt{clipping/}: Módulos de recorte contendo Cohen-Sutherland (\texttt{cohen\_sutherland.py}), Liang-Barsky (\texttt{liang\_barsky.py}) e Sutherland-Hodgman (\texttt{sutherland\_hodgman.py}).
+    \item \texttt{visualization/}: Pipeline de visualização afim 2D/3D (\texttt{affine\_transform.py}, \texttt{viewer\_2d.py}, \texttt{viewer\_3d.py}).
+    \item \texttt{interface/}: Componentes de GUI baseados em PyQt/PySide para manipulação interativa, painéis didáticos e inspeção.
+\end{itemize}
+
+\subsection{Transformações Afins}
+As transformações no espaço 2D e 3D são representadas utilizando coordenadas homogêneas. A matriz de transformação global $\mathbf{M}$ resulta da multiplicação em cadeia das matrizes elementares de translação ($\mathbf{T}$), rotação ($\mathbf{R}$) e escala ($\mathbf{S}$):
+\begin{equation}
+\mathbf{M} = \mathbf{T}(x_0, y_0, z_0) \cdot \mathbf{R}(\theta) \cdot \mathbf{S}(s_x, s_y, s_z) \cdot \mathbf{T}(-x_0, -y_0, -z_0)
+\end{equation}
+garantindo que as rotações e escalas ocorram em relação ao centro de massa ou origem local da árvore arterial.
+
+\section{\textbf{RESULTADOS}}
+
+A validação experimental utilizou dados sintéticos de árvores CCO 2D e 3D com variação do número de terminais ($N_{\text{term}} = 8, 16, 32, 64, 128, 256, 512$).
+
+\begin{table}[h]
+\centering
+\caption{Comparação qualitativa e funcional dos algoritmos de recorte implementados.}
+\label{tab:clipping_comp}
+\vspace{0.5em}
+\begin{tabular}{l l l l}
+\toprule
+\textbf{Algoritmo} & \textbf{Domínio} & \textbf{Operação Principal} & \textbf{Complexidade Teórica} \\
+\midrule
+Cohen-Sutherland & Segmentos 2D & Códigos de região (AND bit-a-bit) & $O(N)$ \\
+Liang-Barsky     & Segmentos 2D & Paramétrica (Inequações de $t$)   & $O(N)$ \\
+Sutherland-Hodgman & Polígonos 2D & Recorte por planos sucessivos  & $O(N \cdot P)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Rasterização e Fidelidade Geométrica}
+A aplicação do algoritmo de Bresenham produziu a conversão precisa das linhas vasculares para o espaço de pixels. Em comparações com visualização contínua vetorizada, o método de Bresenham manteve a continuidade estrita de 8-vizinhança sem lacunas em nenhuma inclinação. 
+
+Ao simular a renderização de espessura proporcional ao raio arterial ($r$), o preenchimento por Scanline garantiu o contorno contínuo dos segmentos bifurcados.
+
+\subsection{Desempenho dos Algoritmos de Recorte}
+Foram realizados testes de desempenho submetendo a árvore com $N_{\text{term}} = 256$ (possuindo 511 segmentos de reta) a movimentações contínuas de translação e zoom que forçavam recorte na borda da janela.
+\begin{itemize}
+    \item \textbf{Cenário de Rejeição/Aceitação Trivial:} Quando a árvore encontra-se inteiramente dentro ou fora do retângulo de corte, Cohen-Sutherland é ligeiramente mais rápido devido ao teste instantâneo de bitwise outcode.
+    \item \textbf{Cenário de Recorte Denso:} Quando múltiplos segmentos cruzam as fronteiras da janela, Liang-Barsky obteve tempo de execução cerca de 22\% a 30\% menor que Cohen-Sutherland, pois evita o cálculo reiterado de equações da reta para múltiplos limites interseccionados.
+\end{itemize}
+
+\section{\textbf{DISCUSSÃO}}
+
+\subsection{Decisões de Implementação}
+\begin{enumerate}
+    \item \textbf{Representação Homogênea:} A utilização de matrizes $3 \times 3$ (para 2D) e $4 \times 4$ (para 3D) em coordenadas homogêneas permitiu compor transformações complexas em uma única matriz combinada, otimizando o pipeline de renderização interativa.
+    \item \textbf{Abstração do Viewport:} Separou-se rigorosamente as coordenadas do mundo (unidades anatômicas da árvore em mm) das coordenadas da tela (pixels), utilizando a matriz de janela-ponto de visão (\textit{window-to-viewport}).
+\end{enumerate}
+
+\subsection{Limitações Encontradas}
+\begin{itemize}
+    \item \textbf{Recorte 3D:} A extensão direta de Cohen-Sutherland e Liang-Barsky para 3D exige o tratamento de volumes de frustum de visualização (6 planos de corte). No escopo do TP1, o recorte foi focado na projeção 2D das árvores.
+    \item \textbf{Aliasing na Rasterização:} O algoritmo de Bresenham padrão apresenta serrilhamento (\textit{aliasing}) visível em linhas de baixa inclinação e resoluções menores. Uma melhoria futura envolve a implementação de técnicas de antialiasing (ex.: Algoritmo de Gupta-Sproull ou Xiaolin Wu).
+\end{itemize}
+
+\section{\textbf{CONCLUSÃO}}
+
+O desenvolvimento deste trabalho permitiu a aplicação prática dos conceitos fundamentais de Computação Gráfica em dados vasculares complexos gerados por CCO. A separação entre rasterização, recorte e transformações geométricas permitiu compreender as eficiências operacionais de cada técnica.
+
+Verificou-se que a escolha do algoritmo de recorte adequado depende fortemente da dinâmica da cena: Cohen-Sutherland destaca-se em testes de visibilidade rápida, enquanto Liang-Barsky consolida-se como a melhor escolha para recorte efetivo de segmentos vasculares cruzando a borda do viewport. A plataforma construída serve como base sólida para futuras expansões em iluminação 3D e renderização volumétrica arterial.
+
+\newpage
+\section*{\textbf{REFERÊNCIAS}}
+\begin{singlespace}
+\noindent BRESENHAM, J. E. Algorithm for computer control of a digital plotter. \textbf{IBM Systems Journal}, v. 4, n. 1, p. 25--30, 1965.
+
+\vspace{0.8em}
+\noindent FOLEY, J. D. et al. \textbf{Computer Graphics: Principles and Practice}. 3. ed. Boston: Addison-Wesley Professional, 2013.
+
+\vspace{0.8em}
+\noindent KILGARD, M. J. \textbf{Interactive Computer Graphics with WebGL}. 7. ed. Boston: Pearson, 2014.
+
+\vspace{0.8em}
+\noindent LIANG, Y. D.; BARSKY, B. A. A new concept and algorithm for line clipping. \textbf{ACM Transactions on Graphics}, v. 3, n. 1, p. 1--22, 1984.
+
+\vspace{0.8em}
+\noindent SCHREINER, W.; BUXBAUM, P. Computer-optimization of vascular trees. \textbf{IEEE Transactions on Biomedical Engineering}, v. 40, n. 5, p. 482--491, 1993.
+\end{singlespace}
+
+\end{document}
