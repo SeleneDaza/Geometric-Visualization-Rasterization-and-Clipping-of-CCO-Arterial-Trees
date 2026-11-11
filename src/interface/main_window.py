@@ -344,10 +344,11 @@ class MainWindow(QMainWindow):
         thickness_title.setObjectName("sectionTitle")
         sidebar_content_layout.addWidget(thickness_title)
 
+        # Configurado de 0 a 200 (onde 100 = 1.0 e 200 = 2.0)
         self.thickness_slider = QSlider(Qt.Orientation.Horizontal)
-        self.thickness_slider.setRange(0, 100)
-        self.thickness_slider.setValue(100)  # Padrão no máximo
-        self.thickness_slider.setToolTip("Ajusta a variação de espessura entre as artérias.")
+        self.thickness_slider.setRange(0, 200)
+        self.thickness_slider.setValue(100)  # Inicia em 1.0 (padrão anterior)
+        self.thickness_slider.setToolTip("Ajusta a variação de espessura entre as artérias até 2.0x.")
         self.thickness_slider.valueChanged.connect(self._update_thickness_scale)
         sidebar_content_layout.addWidget(self.thickness_slider)
         
@@ -367,7 +368,6 @@ class MainWindow(QMainWindow):
         self._root_stack.addWidget(self._main_interface)
         self._root_stack.setCurrentWidget(self._loading_screen)
 
-        # Permite selecionar e copiar os textos da interface
         for label in self.findChildren(QLabel):
             label.setTextInteractionFlags(
                 Qt.TextInteractionFlag.TextSelectableByMouse |
@@ -608,6 +608,8 @@ class MainWindow(QMainWindow):
             self.loader = loader
             self._current_dimension = dimension
             color_map = self.color_map_selector.currentData()
+            
+            # Converte o range do slider (0-200) para a escala (0.0 - 2.0)
             thickness_scale = self.thickness_slider.value() / 100.0
 
             if dimension == 2:
@@ -680,8 +682,7 @@ class MainWindow(QMainWindow):
         worker.deleteLater()
 
     def _update_thickness_scale(self, value):
-        slider_val = self.thickness_slider.value()
-        thickness_scale = slider_val / 100.0
+        thickness_scale = value / 100.0
         
         if self.loader is not None and self._current_dimension == 2:
             model = self.loader.get_model()

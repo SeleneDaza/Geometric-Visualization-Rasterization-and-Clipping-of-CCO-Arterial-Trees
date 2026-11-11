@@ -22,7 +22,7 @@ def add_arterial_mesh(
     model,
     color_map="viridis",
     show_scalar_bar=True,
-    thickness_scale=1.0,  # Parâmetro de escala (0.0 a 1.0)
+    thickness_scale=1.0,  # Agora aceita até 2.0 para maior discrepância
 ):
     if color_map not in COLOR_MAPS:
         raise ValueError(f"Mapa de cores não suportado: {color_map}")
@@ -61,11 +61,14 @@ def add_arterial_mesh(
         padding = max(abs(minimum) * 1e-6, 1e-12)
         color_limits = (minimum - padding, maximum + padding)
 
-    # --- DIFERENÇA DE GROSSURA DINÂMICA ---
+    # --- DIFERENÇA DE GROSSURA EXPANDIDA (Até 2.0) ---
     uniform_widths = np.full(len(_WIDTHS), 3.0)
     full_widths = np.linspace(1.0, 12.0, len(_WIDTHS))
-    active_widths = uniform_widths * (1.0 - thickness_scale) + full_widths * thickness_scale
-    # --------------------------------------
+    
+    # Permitimos amplificar a divergência multiplicando a inclinação por thickness_scale
+    active_widths = uniform_widths * (max(0.0, 2.0 - thickness_scale)) + full_widths * thickness_scale
+    active_widths = np.maximum(0.5, active_widths)  # Garante largura mínima segura
+    # ------------------------------------------------
 
     for bin_index, line_width in enumerate(active_widths):
         selected = valid & (bins == bin_index)

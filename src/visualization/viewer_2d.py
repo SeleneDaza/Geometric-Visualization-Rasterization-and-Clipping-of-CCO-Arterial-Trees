@@ -84,7 +84,6 @@ class Viewer2D(QtInteractor):
         self._cell_picker.SetTolerance(0.01)
 
     def show_model(self, model, color_map="viridis", thickness_scale=1.0):
-        print(f"DEBUG VIEWER: Recebeu thickness_scale = {thickness_scale}")
         interactor = self.iren.interactor
         if self._inspection_observer is not None:
             interactor.RemoveObserver(self._inspection_observer)
