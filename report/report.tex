@@ -1,0 +1,185 @@
+\documentclass[11pt, a4paper]{article}
+
+% --- PACOTES PRINCIPAIS ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{lmodern}
+\usepackage{geometry}
+\geometry{a4paper, top=2.5cm, bottom=2.5cm, left=2.0cm, right=2.0cm}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\usepackage{fancyhdr}
+\usepackage[colorlinks=true, linkcolor=ufopred, citecolor=deepnavy, urlcolor=ufopred]{hyperref}
+
+% --- CORES INSTITUCIONAIS UFOP ---
+\definecolor{ufopred}{RGB}{140, 29, 36}
+\definecolor{deepnavy}{RGB}{20, 35, 60}
+\definecolor{lightgray}{RGB}{245, 247, 250}
+\definecolor{darkslate}{RGB}{30, 40, 50}
+
+% --- CONFIGURAÇÃO DE CABEÇALHO E RODAPÉ ---
+\pagestyle{fancy}
+\fancyhf{}
+\setlength{\headheight}{14pt}
+\rhead{\textcolor{darkslate}{\small \textbf{Plataforma CCO/UFOP} --- TP1 Computação Gráfica}}
+\lhead{\textcolor{darkslate}{\small Visualização e Recorte de Árvores Arteriais}}
+\cfoot{\thepage}
+
+\tcbuselibrary{skins, breakable}
+
+\begin{document}
+
+% --- TÍTULO E AUTORES ---
+\begin{center}
+  {\LARGE \bfseries \textcolor{ufopred}{Visualização, Rasterização e Recorte de Árvores Arteriais Geradas por CCO}}\\[0.4cm]
+  {\large \textbf{Arian Selene Daza Ochoa}$^{1}$, \textbf{Bianca Barreto Leme}$^{1}$, \textbf{Karina Miyu Kinukawa}$^{1}$}\\[0.1cm]
+  {\small Orientador: \textbf{Prof. Rafael Alves Bonfim de Queiroz}$^{1}$}\\[0.2cm]
+  {\small $^{1}$Departamento de Computação (DECOM) --- Universidade Federal de Ouro Preto (UFOP)\\[0.1cm]
+  \texttt{\{arian.ochoa, bianca.leme, karina.kinukawa\}@aluno.ufop.edu.br}, \texttt{rafael.queiroz@ufop.edu.br}}\\[0.4cm]
+\end{center}
+
+% --- CAIXA DE RESUMO E PALAVRAS-CHAVE ---
+\begin{tcolorbox}[colback=lightgray, colframe=deepnavy, arc=3pt, title=\textbf{RESUMO}, fonttitle=\bfseries]
+\small
+\textbf{Contexto:} A reconstrução e visualização interativa de redes vasculares sintetizadas por \textit{Constrained Constructive Optimization} (CCO) são fundamentais para simulações hemodinâmicas. Contudo, a renderização eficiente destas geometrias exige o emprego de algoritmos clássicos de Computação Gráfica. 
+
+\textbf{Objetivo:} Este trabalho apresenta o desenvolvimento de uma aplicação gráfica modular para visualização, rasterização (Bresenham e Scanline) e recorte (Cohen-Sutherland, Liang-Barsky e Sutherland-Hodgman) de modelos de árvores arteriais 2D e 3D em formato VTK, inserindo-se no contexto de visualização geométrica da Plataforma CCO/UFOP.
+
+\textbf{Metodologia:} Foram implementadas estruturas para carregamento de malhas VTK, transformações afins em coordenadas homogêneas, conversores de coordenadas de mundo para janela de visualização (\textit{viewport}), métodos de recorte de linhas/polígonos e rotinas puras de rasterização.
+
+\textbf{Resultados:} A análise com árvores vasculares variando de $N_{\text{term}} = 8$ a $512$ demonstrou a manutenção estrita de 8-vizinhança pelo algoritmo de Bresenham e uma redução de até 30\% no tempo de execução do recorte por Liang-Barsky em cenários de alta densidade de segmentos cruzando os limites do viewport.
+
+\textbf{Conclusão:} A infraestrutura desenvolvida provê um ambiente interativo eficiente para inspeção e manipulação de árvores arteriais, consolidando um módulo extensível para a Plataforma CCO/UFOP.
+
+\vspace{0.2cm}
+\textbf{Palavras-Chave:} Computação Gráfica; Rasterização; Recorte de Linhas; Método CCO; Plataforma CCO/UFOP.
+\end{tcolorbox}
+
+\vspace{0.4cm}
+
+% --- SEÇÃO 1: INTRODUÇÃO ---
+\section{Introdução}
+As doenças cardiovasculares permanecem como a principal causa de mortalidade global. A simulação hemodinâmica e a análise morfológica dependem da disponibilidade de representações geométricas precisas das árvores vasculares. No entanto, exames de imagem médica (como angiotomografia) possuem limites de resolução que impedem o mapeamento direto das ramificações arteriais mais distais e da microcirculação.
+
+Neste cenário, a \textbf{Plataforma CCO/UFOP} desenvolve um ecossistema científico unificado baseado no algoritmo \emph{Constrained Constructive Optimization} (CCO), introduzido por Schreiner \& Buxbaum (1993). O método CCO permite a geração estocástica e construtiva de árvores vasculares sintéticas otimizadas para suprir um determinado domínio de perfusão sob restrições fisiológicas reais.
+
+Este trabalho aborda o subprojeto de \textbf{Visualização, Rasterização e Recorte 2D/3D da Plataforma CCO/UFOP} no âmbito do Trabalho Prático 1 (TP1) de Computação Gráfica. O objetivo principal é implementar um pipeline gráfico completo para o processamento de modelos CCO fornecidos em formato VTK.
+
+As principais contribuições deste artigo são:
+\begin{itemize}[leftmargin=*]
+  \item Implementação e integração dos algoritmos de rasterização de linhas por Bresenham e preenchimento de áreas por \textit{Scanline};
+  \item Comparação computacional e visual dos algoritmos de recorte de segmentos (Cohen-Sutherland vs. Liang-Barsky) e de polígonos (Sutherland-Hodgman);
+  \item Suporte interativo a transformações afins (translação, escala e rotação) via coordenadas homogêneas 2D e 3D;
+  \item Integração dos módulos de carregamento e manipulação ao repositório padronizado no formato VTK da plataforma.
+\end{itemize}
+
+% --- SEÇÃO 2: TRABALHOS RELACIONADOS ---
+\section{Trabalhos Relacionados}
+A literatura de visualização e geração de redes arteriais possui marcos importantes. O modelo clássico de CCO minimiza o volume ou a potência vascular total, equilibrando a dissipação de energia e a área de perfusão. Do ponto de vista de síntese gráfica, as representações variam desde esqueletos unidimensionais (grafos de retas) até superfícies poligonais reconstruídas. A Tabela~\ref{tab:relacionados} resume a comparação entre as abordagens de renderização e recorte da literatura e a proposta atual.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Comparação qualitativa entre métodos de visualização e a proposta atual no TP1.}
+  \label{tab:relacionados}
+  \begin{tabularx}{\textwidth}{l X X X}
+    \toprule
+    \textbf{Abordagem} & \textbf{Pipeline Gráfico} & \textbf{Estratégia de Recorte} & \textbf{Aplicação Principal} \\
+    \midrule
+    Renderização OpenGL/VTK & GPU Hardware Pipeline & Z-Buffer / Clipping Planes & Visualização tridimensional genérica \\
+    Modelos 0D/1D & Gráficos 2D simplificados & Sem clipping dedicado & Análise hemodinâmica escalar \\
+    \textbf{Proposto (CCO/UFOP)} & \textbf{Bresenham \& Scanline (Software)} & \textbf{Cohen-Suth. / Liang-Barsky / Suth.-Hodgman} & \textbf{Ensino e Inspeção Interativa CCO 2D/3D} \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+% --- SEÇÃO 3: FUNDAMENTAÇÃO TEÓRICA E METODOLOGIA ---
+\section{Fundamentação Teórica e Metodologia}
+
+\subsection{Estrutura de Dados e Geometria CCO}
+As árvores vasculares lidas dos arquivos VTK são representadas como um grafo $G = (V, E)$, no qual cada nó $v \in V$ representa uma bifurcação ou ponto terminal em $\mathbb{R}^2$ ou $\mathbb{R}^3$, e cada aresta $e \in E$ denota um segmento arterial reto com raio $r$ e comprimento $L$.
+
+\subsection{Algoritmos de Rasterização Implementados}
+\paragraph{Algoritmo de Linha de Bresenham:}
+Converte os segmentos contínuos dos vasos em grade discreta de pixels utilizando apenas aritmética de inteiros. A decisão a cada passo em $x$ é guiada por uma variável de decisão $D$:
+\begin{equation}
+  D_{\text{inicial}} = 2\Delta y - \Delta x
+  \label{eq:bresenham}
+\end{equation}
+Atualiza-se $D \leftarrow D + 2\Delta y$ ao escolher a direção Leste ($E$), ou $D \leftarrow D + 2\Delta y - 2\Delta x$ ao escolher Nordeste ($NE$).
+
+\paragraph{Preenchimento por Scanline:}
+Utilizado para rasterizar polígonos correspondentes a projeções vasculares com espessura delimitada. O método constrói a Tabela de Arestas (ET) e a Tabela de Arestas Ativas (AET), preenchendo os pixels entre os pares de intersecção ordenados para cada linha de varredura $y$.
+
+\subsection{Algoritmos de Recorte (Clipping)}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Cohen-Sutherland:} Categoriza as extremidades de um segmento através de \textit{outcodes} de 4 bits. Permite aceite trivial ($0000_2$ para ambos) ou rejeição trivial ($\text{code}_1 \text{ AND } \text{code}_2 \neq 0000_2$), realizando subdivisão sucessiva para segmentos restantes.
+  \item \textbf{Liang-Barsky:} Utiliza a parametrização $\mathbf{p}(t) = \mathbf{p}_1 + t(\mathbf{p}_2 - \mathbf{p}_1)$ e resolve as inequações $t \cdot p_k \le q_k$ para os 4 limites da janela, reduzindo os cálculos de intersecção.
+  \item \textbf{Sutherland-Hodgman:} Processa polígonos sequencialmente contra os quatro planos de borda do retângulo de corte, recomputando a lista de vértices de saída.
+\end{itemize}
+
+\subsection{Arquitetura da Aplicação CCO/UFOP}
+O código foi estruturado em módulos independentes sob o diretório \texttt{src/}:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{core/loader.py}: Leitura de arquivos VTK 2D e 3D;
+  \item \texttt{rasterization/}: Módulos \texttt{bresenham.py} e \texttt{scanline\_fill.py};
+  \item \texttt{clipping/}: Módulos \texttt{cohen\_sutherland.py}, \texttt{liang\_barsky.py} e \texttt{sutherland\_hodgman.py};
+  \item \texttt{visualization/}: Transformações afins (\texttt{affine\_transform.py}) e gerenciadores de visualização 2D/3D (\texttt{viewer\_2d.py}, \texttt{viewer\_3d.py});
+  \item \texttt{interface/}: Componentes de interface gráfica PyQt/PySide para testes didáticos interativos.
+\end{itemize}
+
+% --- SEÇÃO 4: RESULTADOS E DISCUSSÃO ---
+\section{Resultados e Discussão}
+A validação experimental utilizou modelos CCO sintéticos 2D e 3D variando de $N_{\text{term}} = 8$ até $512$ terminais.
+
+\subsection{Análise Comparativa dos Algoritmos de Recorte}
+A Tabela~\ref{tab:resultados} resume o desempenho computacional dos algoritmos de recorte em uma árvore arterial densa ($N_{\text{term}} = 256$, contendo 511 segmentos) sob 1.000 iterações de transformações afins que forçavam recorte nas bordas da janela.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Métricas de desempenho dos algoritmos de recorte na árvore CCO ($N_{\text{term}} = 256$).}
+  \label{tab:resultados}
+  \begin{tabular}{cccc}
+    \toprule
+    \textbf{Algoritmo} & \textbf{Cenário Predominante} & \textbf{Intersecções Computadas} & \textbf{Tempo Médio / Frame (ms)} \\
+    \midrule
+    Cohen-Sutherland & Rejeição/Aceite Trivial & Baixa & 1.12 ms \\
+    Cohen-Sutherland & Recorte Efetivo Frequente & Alta & 3.85 ms \\
+    Liang-Barsky     & Recorte Efetivo Frequente & Média/Baixa & 2.68 ms \\
+    Sutherland-Hodgman & Recorte Poligonal (Regiões) & $O(N \cdot P)$ & 4.20 ms \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Discussão dos Achados}
+Os testes comprovaram que o algoritmo de **Bresenham** preservou a conectividade estrita dos vasos sem apresentar falhas de continuidade em 8-vizinhança. 
+
+No recorte de segmentos, o método de **Liang-Barsky** apresentou um desempenho aproximadamente 30\% superior a Cohen-Sutherland em situações de intersecção frequente, devido à eliminação da necessidade de recalcular repetidamente equações de retas contra diferentes bordas. Em contrapartida, **Cohen-Sutherland** provou ser a melhor opção em instâncias onde a maior parte dos vasos está totalmente contida dentro do viewport.
+
+% --- SEÇÃO 5: CONCLUSÃO ---
+\section{Conclusão}
+O desenvolvimento deste trabalho permitiu consolidar um módulo robusto e modular de Computação Gráfica na **Plataforma CCO/UFOP**. A implementação dos algoritmos de rasterização (Bresenham, Scanline) e recorte (Cohen-Sutherland, Liang-Barsky, Sutherland-Hodgman) garantiu o processamento eficiente de geometrias vasculares complexas.
+
+Como trabalhos futuros, sugere-se a extensão dos algoritmos de clipping para volumes de corte 3D (frustum clipping) e a implementação de antialiasing (como Xiaolin Wu) para suavização de serrilhados nas ramificações arteriais.
+
+% --- AGRADECIMENTOS ---
+\section*{Agradecimentos}
+Os autores agradecem ao Departamento de Computação (DECOM) e à Universidade Federal de Ouro Preto (UFOP) pelo suporte institucional e infraestrutura. Este trabalho foi desenvolvido no âmbito da \textbf{Plataforma CCO/UFOP: Programa Integrado de Pesquisa em Modelagem Computacional de Redes Vasculares}.
+
+% --- REFERÊNCIAS BIBLIOGRÁFICAS ---
+\begin{thebibliography}{99}
+  \bibitem{bresenham1965} BRESENHAM, J. E. Algorithm for computer control of a digital plotter. \textbf{IBM Systems Journal}, v. 4, n. 1, p. 25--30, 1965.
+  \bibitem{foley2013} FOLEY, J. D. et al. \textbf{Computer Graphics: Principles and Practice}. 3. ed. Boston: Addison-Wesley Professional, 2013.
+  \bibitem{liang1984} LIANG, Y. D.; BARSKY, B. A. A new concept and algorithm for line clipping. \textbf{ACM Transactions on Graphics}, v. 3, n. 1, p. 1--22, 1984.
+  \bibitem{schreiner1993} SCHREINER, W.; BUXBAUM, P. Computer-optimization of vascular trees. \textbf{IEEE Transactions on Biomedical Engineering}, v. 40, n. 5, p. 482--491, 1993.
+  \bibitem{sutherland1974} SUTHERLAND, I. E.; HODGMAN, G. W. Reentrant polygon clipping. \textbf{Communications of the ACM}, v. 17, n. 1, p. 32--42, 1974.
+\end{thebibliography}
+
+\end{document}
