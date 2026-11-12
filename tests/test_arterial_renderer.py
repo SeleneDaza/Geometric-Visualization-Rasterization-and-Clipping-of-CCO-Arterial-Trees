@@ -60,6 +60,31 @@ class ArterialRendererTests(unittest.TestCase):
         self.assertEqual(len(plotter.meshes), 1)
         self.assertEqual(plotter.meshes[0][1]["line_width"], 3)
 
+    def test_thickness_scale_changes_width_spread(self):
+        uniform_plotter = RecordingPlotter()
+        add_arterial_mesh(
+            uniform_plotter,
+            self.model,
+            show_scalar_bar=False,
+            thickness_scale=0,
+        )
+        varied_plotter = RecordingPlotter()
+        add_arterial_mesh(
+            varied_plotter,
+            self.model,
+            show_scalar_bar=False,
+            thickness_scale=1,
+        )
+
+        uniform_widths = {
+            options["line_width"] for _, options in uniform_plotter.meshes
+        }
+        varied_widths = {
+            options["line_width"] for _, options in varied_plotter.meshes
+        }
+        self.assertEqual(uniform_widths, {6.0})
+        self.assertGreater(len(varied_widths), 1)
+
     def test_rejects_unknown_color_map(self):
         with self.assertRaises(ValueError):
             add_arterial_mesh(RecordingPlotter(), self.model, "unknown")

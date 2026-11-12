@@ -620,7 +620,11 @@ class MainWindow(QMainWindow):
                 self.visualization_surface.viewer_container.setCurrentWidget(
                     self.viewer_3d
                 )
-                self.viewer_3d.show_model(model, color_map)
+                self.viewer_3d.show_model(
+                    model,
+                    color_map,
+                    thickness_scale=thickness_scale,
+                )
                 self.viewer_3d.set_camera_view("isometric")
                 self.viewer_3d.set_parallel_projection(False)
             self.visualization_surface.transform_panel.reset_controls()
@@ -688,10 +692,10 @@ class MainWindow(QMainWindow):
             color_map = self.color_map_selector.currentData()
             if color_map is None:
                 color_map = self.color_map_selector.currentText().lower()
-                
-            if hasattr(self.visualization_surface, "viewer_2d"):
-                self.visualization_surface.viewer_2d.show_model(
-                    model, 
-                    color_map=color_map, 
-                    thickness_scale=thickness_scale
-                )
+            self.viewer_2d.show_model(
+                model,
+                color_map=color_map,
+                thickness_scale=thickness_scale,
+            )
+        elif self.loader is not None and self._current_dimension == 3:
+            self.viewer_3d.set_thickness_scale(thickness_scale)

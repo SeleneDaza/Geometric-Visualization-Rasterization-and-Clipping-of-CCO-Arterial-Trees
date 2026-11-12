@@ -20,14 +20,16 @@ class Viewer3D(QtInteractor):
         self._model = None
         self._anti_aliasing_enabled = True
         self._color_map = "viridis"
+        self._thickness_scale = 1.0
         self._transform_matrix = np.eye(4)
         self._translation = (0.0, 0.0, 0.0)
         self._rotation = (0.0, 0.0, 0.0)
         self._scale = 1.0
 
-    def show_model(self, model, color_map="viridis"):
+    def show_model(self, model, color_map="viridis", thickness_scale=1.0):
         self._model = model
         self._color_map = color_map
+        self._thickness_scale = thickness_scale
         self._transform_matrix = np.eye(4)
         self._translation = (0.0, 0.0, 0.0)
         self._rotation = (0.0, 0.0, 0.0)
@@ -37,6 +39,11 @@ class Viewer3D(QtInteractor):
     def set_color_map(self, color_map):
         self._color_map = color_map
         self._render_model()
+
+    def set_thickness_scale(self, thickness_scale):
+        self._thickness_scale = thickness_scale
+        if self._model is not None:
+            self._render_model()
 
     def set_antialiasing(self, enabled):
         self._anti_aliasing_enabled = bool(enabled)
@@ -205,7 +212,12 @@ class Viewer3D(QtInteractor):
             self._transform_matrix,
             inplace=False,
         )
-        add_arterial_mesh(self, transformed_model, self._color_map)
+        add_arterial_mesh(
+            self,
+            transformed_model,
+            self._color_map,
+            thickness_scale=self._thickness_scale,
+        )
         if reset_camera:
             self.reset_camera()
         self.render()
