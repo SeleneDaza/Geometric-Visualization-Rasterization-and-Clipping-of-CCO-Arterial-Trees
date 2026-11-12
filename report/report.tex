@@ -158,6 +158,15 @@ A Tabela~\ref{tab:resultados} resume o desempenho computacional dos algoritmos d
   \end{tabular}
 \end{table}
 
+A seguir, listam-se as métricas da máquina utilizada para a execução dos testes.
+
+\begin{itemize}
+    \item \textbf{Processador:} AMD Ryzen 7 5700U with Radeon Graphics (1.80 GHz)
+    \item \textbf{Memória RAM Instalada:} 16,0 GB (utilizável: 14,8 GB)
+    \item \textbf{Placa Gráfica:} AMD Radeon(TM) Graphics (1008 MB)
+    \item \textbf{Tipo de Sistema:} Sistema operacional de 64 bits, processador baseado em x64
+\end{itemize}
+
 \subsection{Discussão dos Achados}
 Os testes comprovaram que o algoritmo de **Bresenham** preservou a conectividade estrita dos vasos sem apresentar falhas de continuidade em 8-vizinhança. 
 
@@ -167,7 +176,7 @@ No recorte de segmentos, o método de **Liang-Barsky** apresentou um desempenho 
 \section{Conclusão}
 O desenvolvimento deste trabalho permitiu consolidar um módulo robusto e modular de Computação Gráfica na **Plataforma CCO/UFOP**. A implementação dos algoritmos de rasterização (Bresenham, Scanline) e recorte (Cohen-Sutherland, Liang-Barsky, Sutherland-Hodgman) garantiu o processamento eficiente de geometrias vasculares complexas.
 
-Como trabalhos futuros, sugere-se a extensão dos algoritmos de clipping para volumes de corte 3D (frustum clipping) e a implementação de antialiasing (como Xiaolin Wu) para suavização de serrilhados nas ramificações arteriais.
+Como trabalhos futuros, sugere-se a extensão dos algoritmos de clipping para volumes de corte 3D (\textit{frustum clipping}), bem como a investigação de técnicas adicionais de suavização, incluindo métodos aplicados diretamente à rasteirização, como o algoritmo de Xiaolin Wu. 
 
 % --- AGRADECIMENTOS ---
 \section*{Agradecimentos}
